@@ -1,5 +1,5 @@
 # webvtt_metadata
-Python program that writes metadata to WebVTT files according to the FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 0.1), using a csv template file. The script does not overwrite the input WebVTT files; output is written to a new folder that is created inside the input folder.
+Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 0.1)](https://www.digitizationguidelines.gov/guidelines/FADGI_WebVTT_embed_guidelines_v0.1_2024-04-18.pdf), using a csv template file. The script does not overwrite the input WebVTT files; output is written to a new folder that is created inside the input folder.
 
 The template includes all strongly recommended elements as well as options to include optional elements:
 - Type
