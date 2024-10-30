@@ -1,0 +1,13 @@
+Element,Value,Secondary Value,,Notes
+Type:,,,,"Enter Type (subtitle, caption, audio description, chapters, or metadata) in B2"
+Language:,,,,Enter Language (ISO 639-3 three letter code) in B3
+Responsible Party:,,,,Enter country code (ISO 3166 alpha 2) in B4 and Entity Name in C4
+Media Identifier:,,,,Enter Identifier Type in C5; script assumes filename is Identifier
+Originating File:,,,,Originating File will populate from script
+File Creator:,,,,"Enter File Creator (lastname, firstname if individual; free text if organization) in B7"
+File Creation Date:,,,,Enter File Creation Date (ISO 8601 YYYY-MM-DD) in B8
+Title:,,,,Optional: Enter Title in B9
+Origin History:,,,,Optional: Enter Origin History in B10
+Local Usage Element:,,,,Use A12 and A13 to change Local Usage Element names
+[software version],,,,Optional Local Usage Element: Enter value in B12
+[review history],,,,Optional: Enter value in B13
