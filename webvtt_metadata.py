@@ -46,9 +46,9 @@ def write_caption():
         writeFile.write(f"{line6}\n")
         writeFile.write(f"{line7}\n")
         writeFile.write(f"{line8}\n")
-        if row[8] != "":
-            writeFile.write(f"{line9}\n")
         if row[9] != "":
+            writeFile.write(f"{line9}\n")
+        if row[10] != "":
             writeFile.write(f"{line10}\n")
         if line11 != "":
             writeFile.write(f"{line11}\n")
@@ -75,7 +75,7 @@ else:
 for filename in glob.glob(directory + '/*.vtt'):
     justName = Path(filename).stem
     outputName = justName + "_new.vtt"
-    origFile = os.path.basename(filename)
+    sourceFile = os.path.basename(filename)
     outputFile = os.path.join(outputDir, outputName)
 
 
@@ -84,25 +84,25 @@ for filename in glob.glob(directory + '/*.vtt'):
         metadataReader = csv.reader(metadataFile)
 
         for row in metadataReader:
-            if row[0] == origFile:
-                print(f"Match found for {origFile}")
+            if row[0] == sourceFile:
+                print(f"Match found for {sourceFile}")
                 line1 = ("WEBVTT")
                 line2 = ("Type: " + row[1])
                 line3 = ("Language: " + row[2])
                 line4 = ("Responsible Party: " + row[3])
                 line5 = ("Media Identifier: " + row[4] + ", " + row[5])
-                line6 = ("Originating File: " + origFile)
-                line7 = ("File Creator: " + row[6])
-                line8 = ("File Creation Date: " + row[7])
-                line9 = ("Title: " + row[8])
-                line10 = ("Origin History: " + row[9])
-                if row[11] != "" and row[13] != "":
-                    line11 = ("Local Usage Element: " + row[10] + " " + row[11] + "; " + row[12] + " " + row[13])
-                elif row[11] != "" and row[13] == "":
-                    line11 = ("Local Usage Element: " + row[10] + " " + row[11])
-                elif row[11] == "" and row[13] != "":
-                    line11 = ("Local Usage Element: " + row[12] + " " + row[13])
-                elif row[11] == "" and row[13] == "":
+                line6 = ("Originating File: " + row[6])
+                line7 = ("File Creator: " + row[7])
+                line8 = ("File Creation Date: " + row[8])
+                line9 = ("Title: " + row[9])
+                line10 = ("Origin History: " + row[10])
+                if row[12] != "" and row[14] != "":
+                    line11 = ("Local Usage Element: " + row[11] + " " + row[12] + "; " + row[13] + " " + row[14])
+                elif row[12] != "" and row[14] == "":
+                    line11 = ("Local Usage Element: " + row[11] + " " + row[12])
+                elif row[12] == "" and row[14] != "":
+                    line11 = ("Local Usage Element: " + row[13] + " " + row[14])
+                elif row[12] == "" and row[14] == "":
                     line11 = ""
 
                   
