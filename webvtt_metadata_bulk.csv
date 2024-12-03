@@ -3,7 +3,7 @@ Type:,,,,"Enter Type (subtitle, caption, audio description, chapters, or metadat
 Language:,,,,Enter Language (ISO 639-3 three letter code) in B3
 Responsible Party:,,,,Enter country code (ISO 3166 alpha 2) in B4 and Entity Name in C4
 Media Identifier:,,,,Enter Identifier Type in C5; script assumes filename is Identifier
-Originating File:,,,,Enter Filename for the AV file from which the WebVTT was created
+Originating File:,,,,Enter Filename for the AV file from which the WebVTT was created in B6
 File Creator:,,,,"Enter File Creator (lastname, firstname if individual; free text if organization) in B7"
 File Creation Date:,,,,Enter File Creation Date (ISO 8601 YYYY-MM-DD) in B8
 Title:,,,,Optional: Enter Title in B9
