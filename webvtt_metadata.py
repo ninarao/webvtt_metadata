@@ -32,11 +32,11 @@ print('vtt directory:',arg2)
 
 
 def write_caption():
-    with open(filename, 'r') as captionFile:
+    with open(filename, 'r', encoding="utf8") as captionFile:
         next(captionFile)
         caption = captionFile.read()
         print("Reading from: " + filename)
-    with open (outputFile, 'w') as writeFile:
+    with open (outputFile, 'w', encoding="utf8") as writeFile:
         print("Writing to: " + outputName)
         writeFile.write(f"{line1}\n")
         writeFile.write(f"{line2}\n")
