@@ -90,7 +90,7 @@ for filename in glob.glob(directory + '/*.vtt'):
     line3 = ("Language: " + mData[2][1])
     line4 = ("Responsible Party: " + mData[3][1] + ", " + mData[3][2])
     line5 = ("Media Identifier: " + justName + ", " + mData[4][2])
-    line6 = ("Originating File: " + mData[5][1])
+    line6 = ("Originating File: " + justName + ".mp4")
     line7 = ("File Creator: " + mData[6][1])
     line8 = ("File Creation Date: " + mData[7][1])
     line9 = ("Title: " + mData[8][1])
