@@ -32,11 +32,11 @@ print('vtt directory:',arg2)
 
 
 def write_caption():
-    with open(filename, 'r', encoding="utf8") as captionFile:
+    with open(filename, 'r') as captionFile:
         next(captionFile)
         caption = captionFile.read()
         print("Reading from: " + filename)
-    with open (outputFile, 'w', encoding="utf8") as writeFile:
+    with open (outputFile, 'w') as writeFile:
         print("Writing to: " + outputName)
         writeFile.write(f"{line1}\n")
         writeFile.write(f"{line2}\n")
@@ -71,18 +71,16 @@ else:
     print("Output folder %s already exists" % outputDir)
 
 
-# make output file in output folder
+# define output file in output folder
 for filename in glob.glob(directory + '/*.vtt'):
     justName = Path(filename).stem
-    outputName = justName + "_new.vtt"
+    outputName = justName + ".vtt"
     sourceFile = os.path.basename(filename)
     outputFile = os.path.join(outputDir, outputName)
-
-
+    
 # read metadata from csv
     with open(arg1, 'r') as metadataFile:
         metadataReader = csv.reader(metadataFile)
-
         for row in metadataReader:
             if row[0] == sourceFile:
                 print(f"Match found for {sourceFile}")
@@ -90,7 +88,10 @@ for filename in glob.glob(directory + '/*.vtt'):
                 line2 = ("Type: " + row[1])
                 line3 = ("Language: " + row[2])
                 line4 = ("Responsible Party: " + row[3])
-                line5 = ("Media Identifier: " + row[4] + ", " + row[5])
+                if row[5] == "":
+                    line5 = ("Media Identifier: " + row[4])
+                elif row[5] != "":
+                    line5 = ("Media Identifier: " + row[4] + ", " + row[5])
                 line6 = ("Originating File: " + row[6])
                 line7 = ("File Creator: " + row[7])
                 line8 = ("File Creation Date: " + row[8])
@@ -105,18 +106,17 @@ for filename in glob.glob(directory + '/*.vtt'):
                 elif row[12] == "" and row[14] == "":
                     line11 = ""
 
-                  
     # write metadata and captions to output files
                 if not os.path.exists(outputFile):
                     write_caption()
                 else:
-                    while True:
-                        print("Output file %s already exists, do you want to overwrite? (y/n)" % outputName)
-                        userDecide = input()
-                        if userDecide == "n":
-                            print("Skipping file")
-                            break
-                        elif userDecide == "y":
-                            print("Overwriting file %s" % outputName)
-                            write_caption()
-                            break
+#                     while True:
+                    print("Output file %s already exists, do you want to overwrite? (y/n)" % outputName)
+                    userDecide = input()
+                    if userDecide == "n":
+                        print("Skipping file")
+                        break
+                    elif userDecide == "y":
+                        print("Overwriting file %s" % outputName)
+                        write_caption()
+                        break
