@@ -13,7 +13,7 @@ import shutil
 from itertools import zip_longest
 
 sys.argv = [
-#     'whisper_vtt_reviewed.py',
+#     'webvtt_metadata.py',
 #     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_files',
 #     '-c',
 #     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv',
