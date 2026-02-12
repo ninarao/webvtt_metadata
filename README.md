@@ -34,11 +34,11 @@ To include additional local usage elements, add column pairs named 'Local Usage 
 
 The csv template is designed so that metadata can be entered separately for each webvtt file. For a version that uses a single set of metadata for all webvtt files in the input folder, use the "_bulk" versions:
 
-``usage: webvtt_metadata_bulk.py [path/to/webvtt_metadata_bulk.csv] [path/to/inputfolder]``
+``webvtt_metadata_bulk.py [path/to/webvtt_metadata_bulk.csv] [path/to/inputfolder]``
 
 For the original version of this script, use the "_v1" versions:
 
-``usage: webvtt_metadata_v1.py [path/to/webvtt_metadata_v1.csv] [path/to/inputfolder]``
+``webvtt_metadata_v1.py [path/to/webvtt_metadata_v1.csv] [path/to/inputfolder]``
 
 ##
 Feedback, comments, suggestions, etc are welcome!
