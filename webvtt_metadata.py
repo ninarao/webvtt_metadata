@@ -13,11 +13,11 @@ import shutil
 from itertools import zip_longest
 
 sys.argv = [
-#     'webvtt_metadata.py',
-#     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_files',
+    'webvtt_metadata.py',
+    '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output',
 #     '-c',
 #     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv',
-#     '-r',
+     '-r',
 #     '-e'
 #     '-p', 
 #     '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output/parent',
@@ -92,7 +92,6 @@ def find_match(m_csv, outputName):
         metadataReader = csv.reader(metadataFile)
         for row_num, row in enumerate(metadataReader):
             if row[0] == outputName:
-#                 print(f'csv match found for {outputName}')
                 match_found = True
                 match_row = row_num
                 return match_row
@@ -246,6 +245,10 @@ def update_fadgi_header(vtt_header_data, creation_date, nodefault):
         combined = vtt_filtered
         return combined
 
+def change_reviewed(vtt_header_data):
+    vtt_header_data['Review History'] = 'Local Usage Element: Review history: human-reviewed'
+    return vtt_header_data
+
 def default_header(creation_date):
     ELMP_header = {'Header': "WEBVTT\n", 'Type': "Type: caption", 'Language': "Language: eng",
                    'Responsible Party': "Responsible Party: US, Emory University",
@@ -379,19 +382,22 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                             combined = build_combined_header(vtt_header_data, csv_row_data, creation_date, reviewed, nodefault)
                     else:
                         if match_row == '':
-                            print('no match found and default metadata is not being applied, skipping to next file')
-                            continue
+                            print('no match found and default metadata is not being applied, only updating review history')
+                            combined = change_reviewed(vtt_header_data)
                         else:
                             print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                             csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                             combined = build_combined_header(vtt_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            combined = change_reviewed(combined)
                 elif m_csv == None and nodefault == False:
                     print('no csv, using default reviewed metadata')
                     combined = update_fadgi_header(vtt_header_data, creation_date, nodefault)
                 else:
-                    print('no csv and default metadata is not being applied, skipping to next file')
-                    continue
-
+                    print('no csv and default metadata is not being applied, only updating review history')
+                    combined = change_reviewed(vtt_header_data)
+        
+        if 'Header' not in combined:
+            combined = {**{'Header': 'WEBVTT\n'}, **combined}
         newfile = os.path.join(outputDir, outputName)
         removed_value = combined.pop('File', 'Key not found')
         newheader = list(combined.values())
@@ -426,11 +432,11 @@ def main(args_):
     if parent_dir != None:
         print(f'directory of parent files:\n\t{parent_dir}')
     else:
-        print(f'directory of parent files:\n\tno parent file directory provided')
+        print('directory of parent files:\n\tno parent file directory provided')
     if reviewed == True:
-        print(f'webvtt files are: reviewed\n\tscript will create/update reviewed FADGI headers')
+        print('webvtt files are: reviewed\n\tscript will create/update reviewed FADGI headers\n\t(will update "Review History" to "human-reviewed"\n\tor create this element if it doesn\'t exist)')
     else:
-        print(f'webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand skip files with existing FADGI headers')
+        print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand skip files with existing FADGI headers')
     if emorydefault == True:
         print('default metadata:\n\tscript will use Emory default metadata set for empty fields')
         nodefault = False
