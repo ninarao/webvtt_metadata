@@ -5,12 +5,9 @@ import sys
 import glob
 from pathlib import Path
 import csv
-import platform
-import datetime
 import re
 import argparse
 import shutil
-from itertools import zip_longest
 
 sys.argv = [
     'webvtt_metadata.py',
@@ -106,7 +103,7 @@ def get_csv_info(source, element_choice, outputDir, localYN):
 
 def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
     if localYN == 'Y':
-            element_choice = 'Local Usage Element: ' + element_choice
+        element_choice = 'Local Usage Element: ' + element_choice
     if m_csv == "":
         while True:
             bulk_val = input(f'\n\n**** Input new element value to apply for field "{element_choice}":     ')
@@ -124,10 +121,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
         if elementline == "":
             print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
             continue
-        if line_count != "":
+        if line_count != -1:
             print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
         if m_csv != "":
-            new_val = find_file(outputName, m_csv, element_choice, col_index)
+            new_val = find_file(outputName, m_csv, col_index)
         else:
             new_val = bulk_val
         if elementline.endswith('\n'):
@@ -162,7 +159,7 @@ def count_file_header(vttfile):
 def find_element_header(count, vttfile, element_choice):
     elementline = ""
     orig_head = []
-    line_count = ""
+    line_count = -1
     with open(vttfile, 'r', encoding='UTF-8') as input:
         for i, line in enumerate(input):
             if i >= count:
@@ -174,7 +171,7 @@ def find_element_header(count, vttfile, element_choice):
                 break
     return elementline, orig_head, line_count
 
-def find_file(outputName, m_csv, element_choice, col_index):
+def find_file(outputName, m_csv, col_index):
     with open(m_csv, 'r', encoding='UTF-8') as mFile:
         mReader = csv.reader(mFile)
         match = False
@@ -225,7 +222,7 @@ def main(args_):
         elif choice == '10':
             localYN = 'Y'
             while True:
-                element_choice = input(f'\n\n**** Input name of local usage element:     ')
+                element_choice = input('\n\n**** Input name of local usage element:     ')
                 proceed_yn = ask_yes_no(f'New value: "Local Usage Element: {element_choice}". Is this correct?')
                 if proceed_yn == 'Y':
                     revise_element(source, element_choice, outputDir, localYN)
