@@ -38,13 +38,13 @@ The csv template is designed so that metadata can be entered separately for each
 
 ``webvtt_metadata_bulk.py [path/to/webvtt_metadata_bulk.csv] [path/to/inputfolder]``
 
-If you just need to replace a single element in a WebVTT header, use `webvtt_whoops.py`:
+Or if you just need to replace a single element in a WebVTT header, use `webvtt_whoops.py`:
 
 ``webvtt_whoops.py [path/to/inputfolder]`` 
 
 (This script will prompt for an optional csv - if replacing with values from a csv, the name of the element should be in the header row.)
 
-For the original version of this script, use the "_v1" versions:
+Or for the original version of this script, use the "_v1" versions:
 
 ``webvtt_metadata_v1.py [path/to/webvtt_metadata_v1.csv] [path/to/inputfolder]``
 
