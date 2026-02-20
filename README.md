@@ -32,6 +32,8 @@ Any elements left blank will not be included in the output header (or will be fi
 
 To include additional local usage elements, add column pairs named 'Local Usage Element 2 Key' and 'Local Usage Element 2 Value', and fill the key column with the name of the element and the value column with the value for the element. Repeat as needed, increasing the number in the column names.
 
+## Variations
+
 The csv template is designed so that metadata can be entered separately for each webvtt file. For a version that uses a single set of metadata for all webvtt files in the input folder, use the "_bulk" versions:
 
 ``webvtt_metadata_bulk.py [path/to/webvtt_metadata_bulk.csv] [path/to/inputfolder]``
