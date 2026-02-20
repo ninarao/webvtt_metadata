@@ -126,7 +126,6 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
             continue
         if line_count != "":
             print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-            print(orig_head)
         if m_csv != "":
             new_val = find_file(outputName, m_csv, element_choice, col_index)
         else:
@@ -135,7 +134,6 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
             new_val = element_choice + ': ' + new_val + '\n'
         print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
         new_head = [new_val if x == elementline else x for x in orig_head]
-        print(new_head)
         newfile = os.path.join(outputDir, outputName)
         with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
             for item in new_head:
