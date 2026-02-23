@@ -9,10 +9,10 @@ import re
 import argparse
 import shutil
 
-sys.argv = [
-    'webvtt_metadata.py',
-    '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_files/metadata_updated'
-    ]
+#sys.argv = [
+#    'webvtt_metadata.py',
+#    '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_files/metadata_updated'
+#    ]
 # /Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv
 
 def setup(args_):
