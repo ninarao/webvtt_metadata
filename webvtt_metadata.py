@@ -17,7 +17,7 @@ sys.argv = [
     '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output',
 #     '-c',
 #     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv',
-     '-r',
+#     '-r',
 #     '-e'
 #     '-p', 
 #     '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output/parent',
