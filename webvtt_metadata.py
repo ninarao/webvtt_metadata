@@ -14,13 +14,13 @@ from itertools import zip_longest
 
 # sys.argv = [
 #     'webvtt_metadata.py',
-#     '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output',
+#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/samplefiles',
 #     '-c',
-#     '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv',
+#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/webvtt_metadata.csv',
 #     '-r',
-#     '-e'
+#     '-e',
 #     '-p', 
-#     '/Users/nraogra/Desktop/Captioning/whisperdemo/vkttt_7min/data/output/parent',
+#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/samplefiles',
 #     ]
 
 def valid_directory(path_string):
@@ -109,12 +109,12 @@ def get_csv_metadata(match_row, m_csv):
         values = data[match_row]
         zipped = zip_longest(keys, values, fillvalue='')
         csv_row_data = dict(zipped)
-        if csv_row_data.get("Parent File"):
-            parentfile = csv_row_data["Parent File"]
-            return csv_row_data, parentfile
-        else:
-            parentfile = ''
-            return csv_row_data, parentfile
+        parentkey = [k for k, v in csv_row_data.items() if v.casefold() == "parent file".casefold()]
+        parentval = [item.replace("Key", "Value") for item in parentkey]
+        del parentval[1:]
+        pval_str = ''.join(parentval)
+        parentfile = csv_row_data.get(pval_str, "")
+        return csv_row_data, parentfile
         
 def assess_parent_header(parentfile, parent_dir):
     if parent_dir is None:
@@ -144,27 +144,43 @@ def assess_parent_header(parentfile, parent_dir):
             return parent_head
 
 def get_header_data(parent_head):
-    keys_list = ["Header", "Type", "Language", "Responsible Party",
-                 "Media Identifier", "Originating File", "File Creator",
-                 "File Creation Date", "Title", "Origin History",
-                 "Software Version", "Review History", "Reviewer",
-                 "Editing Method", "Parent File"]
     parent_head = [x for x in parent_head if x != '\n']
     values_list = parent_head
-    zipped = zip_longest(keys_list, values_list, fillvalue='')
-    header_data = dict(zipped)
-    old_version = '; Review history: unreviewed'
-    for key, value in header_data.items():
-        if isinstance(value, str):
-            header_data[key] = value.replace(old_version, '')
-            header_data.update({"Review History": "Local Usage Element: Review history: unreviewed"})
-    return header_data
+    if parent_head[0] == 'WEBVTT\n':
+        parent_head[0] = 'Header: WEBVTT\n'
+    indices = [i for i, s in enumerate(parent_head) if "Local Usage Element" in s]
+    if indices:
+        locals = []
+        for i in indices:
+            locals.append(parent_head[i])
+            new_locals = [item.replace("Local Usage Element: ", "") for item in locals]
+        string = '; '.join(new_locals)
+        new_string = string.replace("\n", "")
+        new_string = new_string.replace("Software version:", "[software version]")
+        new_string = new_string.replace("Review History:", "[review history]")
+        header_locals = new_string.replace("Review history:", "[review history]")
+        local_string = "Local Usage Element: " + header_locals
+        for index in sorted(indices, reverse=True):
+            del parent_head[index]
+    else:
+        header_locals = ""
+    header_keys = dict(item.split(':', 1) for item in parent_head)
+    header_keys = list({k.strip(): v.strip() for k, v in header_keys.items()})
+    header_data = dict(zip(header_keys, values_list))
+    header_data["Local Usage Element"] = local_string
+    header_data.update({'Header': 'WEBVTT\n'})
+    return header_data, header_locals
 
-def build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault):
+def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
+    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
+            'Originating File', 'File Creator', 'File Creation Date', 'Title',
+            'Origin History', 'Local Usage Element']
+    base_dict = dict.fromkeys(keys, "")
     default_head = default_header(creation_date)
     if reviewed == True:
-        new_default = default_update(creation_date)
+        new_default = default_update()
         default_head = default_head | new_default
+    csv_row_data = {k:v for k, v in csv_row_data.items() if v != ''}
     localkeys = r'^Local Usage Element \d+ Key'
     keymatches = {}
     localvals = r'^Local Usage Element \d+ Value'
@@ -172,18 +188,19 @@ def build_combined_header(parent_header_data, csv_row_data, creation_date, revie
     for key, value in csv_row_data.items():
         if re.search(localkeys, key):
             keymatches[key] = value
-            to_rem = " Key"
-            newkeys = {key.replace(to_rem, ''): value for key, value in keymatches.items()}
     for key, value in csv_row_data.items():
         if re.search(localvals, key):
             valmatches[key] = value
-            to_rem = " Value"
-            newvals = {key.replace(to_rem, ''): value for key, value in valmatches.items()}
-    if newkeys and newvals:
-        locals = {newkeys[key]: newvals[key] for key in newkeys if key in newvals}
-    if locals:
-        for key, value in locals.items():
-            locals[key] = "Local Usage Element: " + key + " " + value
+    if keymatches and valmatches:
+        keyslist = list(keymatches.values())
+        keyslist_formatted = ["[" + item + "]" for item in keyslist]
+        valslist = list(valmatches.values())
+        locals = dict(zip(keyslist_formatted, valslist))
+        local_list = [f"{k} {v}" for k, v in locals.items()]
+        local_string = "; ".join(map(str, local_list))
+        locals = True
+    else:
+        locals = False
     easy_keysie = ["Language", "Type", "Responsible Party", "Originating File",
                    "File Creator", "Title", "Origin History"]
     for key in easy_keysie:
@@ -197,34 +214,28 @@ def build_combined_header(parent_header_data, csv_row_data, creation_date, revie
         csv_row_data["File Creation Date"] = "File Creation Date: " + csv_row_data["File Creation Date"]
     else:
         csv_row_data["File Creation Date"] = "File Creation Date: " + creation_date
-    if csv_row_data.get("Software Version"):
-        csv_row_data["Software Version"] = "Local Usage Element: Software version: " + csv_row_data["Software Version"]
-    if csv_row_data.get("Review History"):
-        csv_row_data["Review History"] = "Local Usage Element: Review history: " + csv_row_data["Review History"]
-    elif reviewed == False and nodefault == False:
-        csv_row_data["Review History"] = "Local Usage Element: Review history: unreviewed"
-    elif reviewed == True and nodefault == False:
-        csv_row_data["Review History"] = "Local Usage Element: Review history: human-reviewed"
-    if csv_row_data.get("Reviewer"):
-        csv_row_data["Reviewer"] = "Local Usage Element: Reviewer: " + csv_row_data["Reviewer"]
-    if csv_row_data.get("Parent File"):
-        csv_row_data["Parent File"] = "Local Usage Element: Parent File: " + csv_row_data["Parent File"]
     keys_to_keep = ["Language", "Type", "Responsible Party", "Media Identifier", 
                    "Originating File", "File Creator", "Title", "Origin History",
-                    "File Creation Date", "Software Version", "Review History",
-                    "Reviewer", "Parent File"]
+                    "File Creation Date"]
     csv_keys_kept = {k:v for k, v in csv_row_data.items() if k in keys_to_keep}
     csv_filtered = {k:v for (k, v) in csv_keys_kept.items() if v}
-    if locals:
-        csv_filtered.update(locals)
+    if header_locals != "" and locals == True:
+        csv_filtered["Local Usage Element"] = "Local Usage Element: " + header_locals + "; " + local_string
+    elif header_locals == "" and locals == True:
+        csv_filtered["Local Usage Element"] = "Local Usage Element: " + local_string
+    elif header_locals != "" and locals == False:
+        csv_filtered["Local Usage Element"] = "Local Usage Element: " + header_locals
+    if creation_date == "no_update":
+        csv_filtered.pop("File Creation Date", None)
     if nodefault == False:
+        default = base_dict | default_head
         if parent_header_data != '':
             parent_filtered = {k:v for (k, v) in parent_header_data.items() if v}
-            combined = default_head | parent_filtered
+            combined = default | parent_filtered
             combined = combined | csv_filtered
             return combined
         else:
-            combined = default_head | csv_filtered
+            combined = default | csv_filtered
             return combined
     else:
         if parent_header_data != '':
@@ -236,17 +247,32 @@ def build_combined_header(parent_header_data, csv_row_data, creation_date, revie
             return combined
 
 def update_fadgi_header(vtt_header_data, creation_date, nodefault):
-    default_head = default_update(creation_date)
+    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
+            'Originating File', 'File Creator', 'File Creation Date', 'Title',
+            'Origin History', 'Local Usage Element']
+    base_dict = dict.fromkeys(keys, "")
+    default_hed = default_header(creation_date)
+    if creation_date == "no_update":
+        default_hed.pop("File Creation Date", None)
+    default_up = default_update()
+    default_head = default_hed | default_up
     vtt_filtered = {k:v for (k, v) in vtt_header_data.items() if v}
+    vtt_filtered.update({'Header': 'WEBVTT\n'})
+    vtt_filtered['Local Usage Element'] = vtt_filtered['Local Usage Element'].replace("unreviewed", "human-reviewed")
     if nodefault == False:
-        combined = vtt_filtered | default_head
+        default = base_dict | default_head
+        combined = default | vtt_filtered
         return combined
     else:
         combined = vtt_filtered
         return combined
 
 def change_reviewed(vtt_header_data):
-    vtt_header_data['Review History'] = 'Local Usage Element: Review history: human-reviewed'
+    local = vtt_header_data.get("Local Usage Element", "")
+    review = "review history"
+    if review.casefold() in local.casefold():
+        new_local = local.replace("unreviewed", "human-reviewed")
+        vtt_header_data['Local Usage Element'] = new_local
     return vtt_header_data
 
 def default_header(creation_date):
@@ -258,20 +284,14 @@ def default_header(creation_date):
                    'File Creation Date': f"File Creation Date: {creation_date}",
                    'Title': "Title: unknown",
                    'Origin History': "Origin History: Created by Emory Libraries Media Preservation",
-                   'Software Version': "Local Usage Element: Software version: unknown",
-                   'Review History': "Local Usage Element: Review history: unreviewed",
-                   'Reviewer': 'Local Usage Element: Reviewer: none',
-                   'Editing Method': 'Local Usage Element: Editing Method: none',
-                   'Parent File': 'Local Usage Element: Parent File: none'
+                   'Local Usage Element': "Local Usage Element: [review history] unreviewed; [parent file] none"
                    }
     return ELMP_header
 
-def default_update(creation_date):
-    ELMP_update = {'File Creation Date': f"File Creation Date: {creation_date}",
-                   'Review History': "Local Usage Element: Review history: human-reviewed",
-                   'Reviewer': 'Local Usage Element: Reviewer: unknown',
-                   'Editing Method': 'Local Usage Element: Editing Method: unknown',
-                   'Parent File': 'Local Usage Element: Parent File: unknown'
+def default_update():
+    ELMP_update = {
+                   'Local Usage Element': "Local Usage Element: [review history] human-reviewed; [reviewer] unknown; " \
+                   "[editing method] unknown; [parent file] unknown"
                    }
     return ELMP_update
 
@@ -308,7 +328,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                     else:
                         print('no match found, applying default reviewed metadata')
                         default_head = default_header(creation_date)
-                        new_default = default_update(creation_date)
+                        new_default = default_update()
                         combined = default_head | new_default
                 elif match_row == -1 and nodefault == True:
                     print('no match found and default metadata is not being applied, skipping to next file')
@@ -322,14 +342,18 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                         if parent_head == None:
                             print('no parent file FADGI header')
                             parent_header_data = ''
-                            combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            header_locals = ''
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                         else:
                             print('combining parent file header and metadata from csv...')
-                            parent_header_data = get_header_data(parent_head)
-                            combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            parent_header_data, header_locals = get_header_data(parent_head)
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                            if reviewed == True:
+                                combined = change_reviewed(combined)
                     else:
                         parent_header_data = ''
-                        combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                        header_locals = ''
+                        combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                 else:
                     print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                     csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
@@ -339,14 +363,19 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                         if parent_head == None:
                             print('no parent file FADGI header')
                             parent_header_data = ''
-                            combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            header_locals = ''
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                         else:
                             print('combining parent file header and metadata from csv...')
-                            parent_header_data = get_header_data(parent_head)
-                            combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            header_locals = ''
+                            parent_header_data, header_locals = get_header_data(parent_head)
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                            if reviewed == True:
+                                combined = change_reviewed(combined)
                     else:
                         parent_header_data = ''
-                        combined = build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                        header_locals = ''
+                        combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
             else:
                 if nodefault == False:
                     if reviewed == False:
@@ -355,42 +384,71 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                     else:
                         print('no csv and no header, using default reviewed metadata')
                         default_head = default_header(creation_date)
-                        new_default = default_update(creation_date)
+                        new_default = default_update()
                         combined = default_head | new_default
                 else:
                     print('no csv, no header, and default metadata is not being applied, skipping to next file')
                     continue
         else:
             print(f'FADGI header detected: {line_count} lines')
+            vtt_head = assess_parent_header(newvtt, reviewed_dir)
+            vtt_header_data, header_locals = get_header_data(vtt_head)
             if reviewed == False:
-                print('no update, skipping to next file\n')
-                continue
+                if m_csv != None:
+                    print('checking csv for match...')
+                    match_row = find_match(m_csv, outputName)
+                    if nodefault == True:
+                        if match_row == -1:
+                            print('no match found and default metadata is not being applied, skipping to next file')
+                            continue
+                        else:
+                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                            creation_date = "no_update"
+                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                    else:
+                        if match_row == -1:
+                            print('no match found, applying default unreviewed metadata')
+                            default_head = default_header(creation_date)
+                            combined = default_head | vtt_header_data
+                        else:
+                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                else:
+                    if nodefault == True:
+                        print('no csv and default metadata is not being applied, skipping to next file')
+                        continue
+                    else:
+                        print('no csv, using default unreviewed metadata')
+                        default_head = default_header(creation_date)
+                        combined = default_head | vtt_header_data
             else:
                 print('changing review history to reviewed')
-                vtt_head = assess_parent_header(newvtt, reviewed_dir)
-                vtt_header_data = get_header_data(vtt_head)
                 if m_csv != None:
                     print('checking csv for match...')
                     match_row = find_match(m_csv, outputName)
                     if nodefault == False:
-                        if match_row == '':
+                        if match_row == -1:
                             print('no match found, applying default reviewed metadata')
                             combined = update_fadgi_header(vtt_header_data, creation_date, nodefault)
                         else:
                             print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                             csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            combined = build_combined_header(vtt_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                            combined = change_reviewed(combined)
                     else:
-                        if match_row == '':
+                        if match_row == -1:
                             print('no match found and default metadata is not being applied, only updating review history')
                             combined = change_reviewed(vtt_header_data)
                         else:
                             print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                             csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            combined = build_combined_header(vtt_header_data, csv_row_data, creation_date, reviewed, nodefault)
+                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                             combined = change_reviewed(combined)
                 elif m_csv == None and nodefault == False:
                     print('no csv, using default reviewed metadata')
+                    creation_date = "no_update"
                     combined = update_fadgi_header(vtt_header_data, creation_date, nodefault)
                 else:
                     print('no csv and default metadata is not being applied, only updating review history')
@@ -401,6 +459,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
         newfile = os.path.join(outputDir, outputName)
         removed_value = combined.pop('File', 'Key not found')
         newheader = list(combined.values())
+        newheader = [x for x in newheader if x != '']
         to_remove = "\n"
         newheader = [item.replace(to_remove, "") for item in newheader]
         to_add = "\n"
@@ -434,7 +493,7 @@ def main(args_):
     else:
         print('directory of parent files:\n\tno parent file directory provided')
     if reviewed == True:
-        print('webvtt files are: reviewed\n\tscript will create/update reviewed FADGI headers\n\t(will update "Review History" to "human-reviewed"\n\tor create this element if it doesn\'t exist)')
+        print('webvtt files are: reviewed\n\tscript will create/update reviewed FADGI headers\n\t(will update "review history" to "human-reviewed"\n\tor create this element if it doesn\'t exist)')
     else:
         print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand skip files with existing FADGI headers')
     if emorydefault == True:
