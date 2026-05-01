@@ -132,24 +132,19 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
             elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
             if element_choice == 'NOTE':
                 line_count = count - 1
-                print(line_count)
                 if elementline == "":
                     print(f'{outputName}: "{element_choice}" not found, adding to header')
                     try:
                         index = [i for i, s in enumerate(orig_head) if 'Type' in s]
                     except ValueError:
-                        print('not found')
+                        print('error: not found')
                     if index:
                         index_int = index[0]
                     else:
                         index_int = 0
-                    print(index_int)
                     new_val = 'NOTE\n'
-                    print(orig_head)
                     orig_head.insert(index_int, new_val)
                     new_head = orig_head
-#                     new_head = [new_val]
-                    print(new_head)
                 elif elementline != "":
                     print(f'{outputName}: "{element_choice}" found in header, skipping file.')
                     continue
@@ -266,13 +261,13 @@ def main(args_):
                 else:
                     print('\nReturning to menu.')
                     break
-        elif choice == 'N':
+        elif choice.upper() == 'N':
             localYN = 'N'
             m_csv = ""
             element_choice = 'NOTE'
             col_index = ""
             update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN)
-        elif choice == 'Q':
+        elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
             break
         else:
