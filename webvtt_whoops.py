@@ -113,36 +113,73 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
             else:
                 print('\nReturning to menu.')
                 return
-    for vttfile in glob.glob(f'{source}/*.vtt'):
-        justName = Path(vttfile).stem
-        outputName = justName + ".vtt"
-        count = count_file_header(vttfile)
-        elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
-        if elementline == "":
-            print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
-            continue
-        if line_count != -1:
-            print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-        if m_csv != "":
-            new_val = find_file(outputName, m_csv, col_index)
-        else:
-            new_val = bulk_val
-        if elementline.endswith('\n'):
-            new_val = element_choice + ': ' + new_val + '\n'
-        print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
-        new_head = [new_val if x == elementline else x for x in orig_head]
-        newfile = os.path.join(outputDir, outputName)
-        with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
-            for item in new_head:
-                f_out.write(item)
-            for _ in range(line_count+1):
-                next(f_in, None)
-            shutil.copyfileobj(f_in, f_out)
-        f_in.close()
-        f_out.close()
+    ext = ['.vtt', '.txt']
+    for vttfile in glob.glob(f'{source}/*{ext}'):
+        if os.path.isfile(vttfile):
+#     for vttfile in glob.glob(f'{source}/*.vtt'):
+            justName = Path(vttfile).stem
+            fileExt = Path(vttfile).suffix
+            if fileExt == '.vtt':
+                outputName = justName + ".vtt"
+                print(outputName)
+                pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+                count = count_file_header(vttfile, pattern)
+                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+                if elementline == "":
+                    print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
+                    continue
+                if line_count != -1:
+                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+                if m_csv != "":
+                    new_val = find_file(outputName, m_csv, col_index)
+                else:
+                    new_val = bulk_val
+                if elementline.endswith('\n'):
+                    new_val = element_choice + ': ' + new_val + '\n'
+                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
+                new_head = [new_val if x == elementline else x for x in orig_head]
+                newfile = os.path.join(outputDir, outputName)
+                with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+                    for item in new_head:
+                        f_out.write(item)
+                    for _ in range(line_count+1):
+                        next(f_in, None)
+                    shutil.copyfileobj(f_in, f_out)
+                f_in.close()
+                f_out.close()
+            elif fileExt == '.txt':
+                outputName = justName + ".txt"
+                print(outputName)
+                pattern = r'^Local Usage Element:'
+                count = count_file_header(vttfile, pattern)
+                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+                if elementline == "":
+                    print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
+                    continue
+                if line_count != -1:
+                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+                if m_csv != "":
+                    new_val = find_file(outputName, m_csv, col_index)
+                else:
+                    new_val = bulk_val
+                if elementline.endswith('\n'):
+                    new_val = element_choice + ': ' + new_val + '\n'
+                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
+                new_head = [new_val if x == elementline else x for x in orig_head]
+                newfile = os.path.join(outputDir, outputName)
+                with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+                    for item in new_head:
+                        f_out.write(item)
+                    for _ in range(line_count+1):
+                        next(f_in, None)
+                    shutil.copyfileobj(f_in, f_out)
+                f_in.close()
+                f_out.close()
+            else:
+                continue
         
-def count_file_header(vttfile):
-    pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+def count_file_header(vttfile, pattern):
+#     pattern = r'(\d{2}:\d{2}.\d{3} --> )'
     count = 0
     try:
         with open(vttfile, 'r', encoding='UTF-8') as input:
