@@ -12,16 +12,16 @@ import argparse
 import shutil
 from itertools import zip_longest
 
-sys.argv = [
-    'webvtt_metadata.py',
-    '/Users/nraogra/Desktop/txt-test',
-    '-c',
-    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
-#     '-r',
-#     '-e',
-    '-p', 
-    '/Users/nraogra/Desktop/txt-test',
-    ]
+# sys.argv = [
+#     'webvtt_metadata.py',
+#     '/Users/nraogra/Desktop/txt-test',
+#     '-c',
+#     '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
+# #     '-r',
+# #     '-e',
+#     '-p', 
+#     '/Users/nraogra/Desktop/txt-test',
+#     ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -467,6 +467,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                                     combined = default_head | vtt_header_data
                                 else:
                                     print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                                    creation_date = "no_update"
                                     csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                                     combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                         else:
@@ -475,6 +476,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                                 continue
                             else:
                                 print('no csv, using default unreviewed metadata')
+                                creation_date = "no_update"
                                 default_head = default_header(creation_date)
                                 combined = default_head | vtt_header_data
                     else:
