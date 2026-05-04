@@ -22,6 +22,12 @@ def setup(args_):
         'source',
         help='directory of files'
     )
+    parser.add_argument(
+        "-t",
+        "--txtheader",
+        action="store_true",
+        help="apply to txt files also"
+        )
     args = parser.parse_args(args_)
     return args
 
@@ -101,7 +107,7 @@ def get_csv_info(source, element_choice, outputDir, localYN):
             print('CSV is empty or has no headers.\n')
             return
 
-def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
+def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header):
     if localYN == 'Y':
         element_choice = 'Local Usage Element: ' + element_choice
     if m_csv == "" and element_choice != 'NOTE':
@@ -122,7 +128,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
                 outputName = justName + ".vtt"
                 print(outputName)
                 pattern = r'(\d{2}:\d{2}.\d{3} --> )'
-            elif fileExt == '.txt':
+            elif fileExt == '.txt' and txt_header == True:
                 outputName = justName + ".txt"
                 print(outputName)
                 pattern = r'^Local Usage Element:'
@@ -236,6 +242,12 @@ def main(args_):
     if not os.path.isdir(source):
         print(f"No directory {source} exists, exiting program.")
         sys.exit()
+    if args.txtheader == True:
+        print("\nActions will be applied to txt and vtt files.")
+        txt_header = True
+    else:
+        print("\nActions will be applied to vtt files.")
+        txt_header = False
     outputDir = make_output_dir(source)
     while True:
         main_menu(source)
@@ -266,7 +278,7 @@ def main(args_):
             m_csv = ""
             element_choice = 'NOTE'
             col_index = ""
-            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN)
+            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
         elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
             break
