@@ -12,16 +12,16 @@ import argparse
 import shutil
 from itertools import zip_longest
 
-# sys.argv = [
-#     'webvtt_metadata.py',
-#     '/Users/nraogra/Desktop/txt-test',
+sys.argv = [
+    'webvtt_metadata.py',
+    '/Users/nraogra/Desktop/txt-test',
 #     '-c',
 #     '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
-# #     '-r',
-# #     '-e',
+#     '-r',
+#     '-e',
 #     '-p', 
 #     '/Users/nraogra/Desktop/txt-test',
-#     ]
+    ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -294,6 +294,28 @@ def default_update():
                    }
     return ELMP_update
 
+def check_conformance(line_count, vtt_head):
+    updated = False
+    webvtt_str = 'WEBVTT\n'
+    nl_str = '\n'
+    note_str = 'NOTE'
+    webvtt_index = next((i for i, s in enumerate(vtt_head) if webvtt_str in s), -1)
+    nl_indices = [i for i, s in enumerate(vtt_head) if s == nl_str]
+    note_index = [i for i, s in enumerate(vtt_head) if s == note_str]
+    if webvtt_index != 0:
+        vtt_head.insert(0, webvtt_str)
+        updated = True
+    if 1 not in nl_indices:
+        vtt_head.insert(1, nl_str)
+        updated = True
+    if 2 not in note_index:
+        vtt_head.insert(2, note_str + '\n')
+        updated = True
+    if (line_count - 1) not in nl_indices:
+        vtt_head.append(nl_str)
+        updated = True
+    return vtt_head, updated
+
 def write_new_header(combined, outputDir, outputName, newvtt, line_count):
     if 'Header' not in combined:
         combined = {**{'Header': 'WEBVTT\n'}, **combined}
@@ -306,6 +328,10 @@ def write_new_header(combined, outputDir, outputName, newvtt, line_count):
     to_add = "\n"
     newheader[0] = newheader[0] + to_add
     newheader[-1] = newheader[-1] + to_add
+    blockstart = 'NOTE\n'
+    if blockstart not in newheader[1]:
+        newheader[1] = blockstart + newheader[1]
+    print(f'new header: \n{newheader}')
     with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
         for item in newheader:
             f_out.write(f'{item}\n')
@@ -472,8 +498,23 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                                     combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                         else:
                             if nodefault == True:
-                                print('no csv and default metadata is not being applied, skipping to next file')
-                                continue
+                                print('no csv and default metadata is not being applied, checking conformance only')
+                                vtt_head_new, updated = check_conformance(line_count, vtt_head)
+                                if updated == True:
+                                    print('updating for FADGI conformance')
+                                    newfile = os.path.join(outputDir, outputName)
+                                    with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+                                        for item in vtt_head_new:
+                                            f_out.write(f'{item}')
+                                        for _ in range(line_count):
+                                            next(f_in, None)
+                                        shutil.copyfileobj(f_in, f_out)
+                                    f_in.close()
+                                    f_out.close()
+                                    continue
+                                else:
+                                    print('file conforms, skipping to next file')
+                                    continue
                             else:
                                 print('no csv, using default unreviewed metadata')
                                 creation_date = "no_update"
@@ -510,6 +551,8 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                             print('no csv and default metadata is not being applied, only updating review history')
                             combined = change_reviewed(vtt_header_data)
                 write_new_header(combined, outputDir, outputName, newvtt, line_count)
+#             elif fileExt == '.txt' and m_csv == None:
+                
             elif fileExt == '.txt' and m_csv != None:
                 outputName = justName + ".txt"
                 copy_metadata_to_txt(outputName, newvtt, m_csv, parent_dir, outputDir)
