@@ -15,12 +15,12 @@ from itertools import zip_longest
 sys.argv = [
     'webvtt_metadata.py',
     '/Users/nraogra/Desktop/txt-test',
-#     '-c',
-#     '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
+    '-c',
+    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
 #     '-r',
 #     '-e',
-#     '-p', 
-#     '/Users/nraogra/Desktop/txt-test',
+    '-p', 
+    '/Users/nraogra/Desktop/txt-test',
     ]
 
 def valid_directory(path_string):
@@ -185,7 +185,8 @@ def get_header_data(parent_head):
     header_keys = list({k.strip(): v.strip() for k, v in header_keys.items()})
     header_data = dict(zip(header_keys, values_list))
     header_data["Local Usage Element"] = local_string
-    header_data.update({'Header': 'WEBVTT\n'})
+    if 'Header' in header_data:
+        header_data['Header'] = 'WEBVTT\n'
     return header_data, header_locals
 
 def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
@@ -338,7 +339,7 @@ def check_conformance(line_count, vtt_head, fileExt):
         updated = True
     return vtt_head, updated
 
-def write_new_header(combined, outputDir, outputName, newvtt, line_count):
+def write_new_header(combined, outputDir, outputName, newvtt, line_count, fileExt):
     if 'Header' not in combined:
         combined = {**{'Header': 'WEBVTT\n'}, **combined}
     newfile = os.path.join(outputDir, outputName)
@@ -353,7 +354,17 @@ def write_new_header(combined, outputDir, outputName, newvtt, line_count):
     blockstart = 'NOTE\n'
     if blockstart not in newheader[1]:
         newheader[1] = blockstart + newheader[1]
-    print(f'new header: \n{newheader}')
+    if fileExt == '.txt':
+        if newheader[0] == 'WEBVTT\n':
+            del newheader[0]
+        type_str = 'Type:'
+        type_index = next((i for i, s in enumerate(newheader) if type_str in s), -1)
+        if type_index != -1:
+            newheader[type_index] = newheader[type_index].replace('caption', 'transcript')
+        else:
+            note_str = 'NOTE\n'
+            note_index = next((i for i, s in enumerate(newheader) if note_str in s), -1)
+            newheader[note_index] = newheader[note_index].replace(note_str, note_str + type_str + '\n')
     with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
         for item in newheader:
             f_out.write(f'{item}\n')
@@ -362,6 +373,33 @@ def write_new_header(combined, outputDir, outputName, newvtt, line_count):
         shutil.copyfileobj(f_in, f_out)
     f_in.close()
     f_out.close()
+
+def merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals):
+    header_locals = header_locals.replace("[", "")
+    header_dict = {k.strip(): v.strip() for k, v in (item.split(']') for item in header_locals.split(';'))}
+    p_header_locals = p_header_locals.replace("[", "")
+    p_header_dict = {k.strip(): v.strip() for k, v in (item.split(']') for item in p_header_locals.split(';'))}
+    merged_loc = {}
+    all_keys = set(p_header_dict.keys()) | set(header_dict.keys())
+    allowed_repeats = ['reviewer', 'reviewer_1', 'editing method', 'editing method_1']
+    if any(i in all_keys for i in allowed_repeats):
+        for k in allowed_repeats:
+            if k in header_dict and k in p_header_dict:
+                merged_loc[f'{k}_2'] = header_dict[k]
+                merged_loc[f'{k}_1'] = p_header_dict[k]
+                header_dict.pop(k, None)
+                p_header_dict.pop(k, None)
+    headers = p_header_dict | header_dict
+    merged_locals = headers | merged_loc
+    order = ['software version', 'review history',
+             'reviewer', 'editing method', 'reviewer_1', 'editing method_1',
+             'reviewer_2', 'editing method_2', 'parent file']
+    reordered_keys = {key: merged_locals[key] for key in order if key in merged_locals}
+    other_keys = {k: v for k, v in merged_locals.items() if k not in order}
+    merged_localz = {**reordered_keys, **other_keys}
+    m_loc_str = '; '.join(f'[{k}] {v}' for k, v in merged_localz.items())
+    merged_header_data = parent_header_data | vtt_header_data
+    return merged_header_data, m_loc_str
 
 def copy_metadata_to_txt(outputName, txtfile, m_csv, parent_dir, outputDir, fileExt):
     print(f'\n{outputName}')
@@ -386,7 +424,7 @@ def copy_metadata_to_txt(outputName, txtfile, m_csv, parent_dir, outputDir, file
                     header_locals = ''
                     parent_header_data, header_locals = get_header_data(parent_head)
                     parent_header_data["Type"] = "Type: transcript\n"
-                    write_new_header(parent_header_data, outputDir, outputName, txtfile, line_count)
+                    write_new_header(parent_header_data, outputDir, outputName, txtfile, line_count, fileExt)
             else:
                 print('no parent file, skipping to next file')
     else:
@@ -465,6 +503,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                             combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                     else:
                         print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                        creation_date = "no_update"
                         csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                         if parentfile != '':
                             print(f'contains parent info: {parentfile}, getting parent file header...')
@@ -513,7 +552,20 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                                 print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                                 csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                                 creation_date = "no_update"
-                                combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir, pattern, fileExt)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+#                                         header_locals = ''
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                         else:
                             if match_row == -1:
                                 print('no match found, applying default unreviewed metadata')
@@ -521,9 +573,21 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                                 combined = default_head | vtt_header_data
                             else:
                                 print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                                creation_date = "no_update"
                                 csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                                combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                creation_date = "no_update"
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir, pattern, fileExt)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                     else:
                         if nodefault == True:
                             print('no csv and default metadata is not being applied, checking conformance only')
@@ -582,7 +646,9 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefa
                     else:
                         print('no csv and default metadata is not being applied, only updating review history')
                         combined = change_reviewed(vtt_header_data)
-            write_new_header(combined, outputDir, outputName, newvtt, line_count)
+            if fileExt == '.txt' and line_count != -2:
+                line_count = lines + 1
+            write_new_header(combined, outputDir, outputName, newvtt, line_count, fileExt)
 #             elif fileExt == '.txt' and m_csv == None:
             
 #         elif fileExt == '.txt' and m_csv != None:
