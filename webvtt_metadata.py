@@ -12,16 +12,16 @@ import argparse
 import shutil
 from itertools import zip_longest
 
-# sys.argv = [
-#     'webvtt_metadata.py',
-#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/samplefiles',
-#     '-c',
-#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/webvtt_metadata.csv',
+sys.argv = [
+    'webvtt_metadata.py',
+    '/Users/nraogra/Desktop/txt-test',
+    '-c',
+    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
 #     '-r',
 #     '-e',
-#     '-p', 
-#     '/Users/nraogra/Desktop/Captioning/webvtt_metadata-main/samplefiles',
-#     ]
+    '-p', 
+    '/Users/nraogra/Desktop/txt-test',
+    ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -71,8 +71,7 @@ def make_output_dir(reviewed_dir):
         print(f'\toutput folder already exists: \n\t{outputDir}')
     return outputDir
 
-def get_header_line_count(vttfile):
-    pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+def get_header_line_count(vttfile, pattern, fileExt):
     count = 0
     try:
         with open(vttfile, 'r', encoding='UTF-8') as input:
@@ -85,7 +84,10 @@ def get_header_line_count(vttfile):
     except Exception:
         print('line count error')
         return -1
-    return -1
+    if fileExt == '.vtt':
+        return -1
+    elif fileExt == '.txt':
+        return -2
 
 def find_match(m_csv, outputName):
     with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
@@ -117,31 +119,57 @@ def get_csv_metadata(match_row, m_csv):
         return csv_row_data, parentfile
         
 def assess_parent_header(parentfile, parent_dir):
+    lines = -1
     if parent_dir is None:
         print('no directory for parent files')
         parent_head = None
-        return parent_head
+        return parent_head, lines
     vttfile = os.path.join(parent_dir, parentfile)
     if not os.path.isfile(vttfile):
         print(f'file does not exist: {vttfile}')
         parent_head = None
-        return parent_head
+        return parent_head, lines
     else:
-        line_count = get_header_line_count(vttfile)
-        if line_count == -1:
+        justName = Path(vttfile).stem
+        fileExt = Path(vttfile).suffix
+        if fileExt == '.vtt':
+            outputName = justName + ".vtt"
+            pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+        elif fileExt == '.txt':
+            outputName = justName + ".txt"
+            pattern = r'^Type:'
+        else:
+            print(f'parent file {justName}{fileExt} is not .vtt or .txt')
+            parent_head = None
+            return parent_head, lines
+        lines = get_header_line_count(vttfile, pattern, fileExt)
+        if fileExt == '.txt' and lines != -2:
+            matches = []
+            nl_str = '\n'
+            with open(vttfile, 'r', encoding='UTF-8') as input:
+                for line_num, line in enumerate(input, 0):
+                    if line == nl_str:
+                        matches.append(line_num)
+                        if len(matches) == 2:
+                            break
+            if len(matches) == 1:
+                lines = matches[0]
+            elif len(matches) == 2:
+                lines = matches[1]
+        if lines == -1:
             print('timestamps not found in parent file')
             parent_head = None
-            return parent_head
-        elif line_count == 2:
+            return parent_head, lines
+        elif (lines == 2 and fileExt == '.vtt') or lines == -2:
             print('no FADGI header detected in parent file')
             parent_head = None
-            return parent_head
+            return parent_head, lines
         else:
-            print('FADGI header found')
+            print(f'FADGI header found: {lines} lines')
             with open(vttfile, 'r', encoding='UTF-8') as input:
-                parent_head = [next(input) for _ in range(line_count)]
+                parent_head = [next(input) for _ in range(lines)]
             input.close()
-            return parent_head
+            return parent_head, lines
 
 def get_header_data(parent_head):
     parent_head = [x for x in parent_head if x != '\n']
@@ -167,14 +195,13 @@ def get_header_data(parent_head):
     header_keys = dict(item.split(':', 1) for item in parent_head)
     header_keys = list({k.strip(): v.strip() for k, v in header_keys.items()})
     header_data = dict(zip(header_keys, values_list))
-    header_data["Local Usage Element"] = local_string
-    header_data.update({'Header': 'WEBVTT\n'})
+    if indices:
+        header_data["Local Usage Element"] = local_string
+    if 'Header' in header_data:
+        header_data['Header'] = 'WEBVTT\n'
     return header_data, header_locals
 
-def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
-    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
-            'Originating File', 'File Creator', 'File Creation Date', 'Title',
-            'Origin History', 'Local Usage Element']
+def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys):
     base_dict = dict.fromkeys(keys, "")
     default_head = default_header(creation_date)
     if reviewed == True:
@@ -220,7 +247,8 @@ def build_combined_header(parent_header_data, header_locals, csv_row_data, creat
     csv_keys_kept = {k:v for k, v in csv_row_data.items() if k in keys_to_keep}
     csv_filtered = {k:v for (k, v) in csv_keys_kept.items() if v}
     if header_locals != "" and locals == True:
-        csv_filtered["Local Usage Element"] = "Local Usage Element: " + header_locals + "; " + local_string
+        merged_locals = merge_locals(local_string, header_locals)
+        csv_filtered["Local Usage Element"] = "Local Usage Element: " + merged_locals
     elif header_locals == "" and locals == True:
         csv_filtered["Local Usage Element"] = "Local Usage Element: " + local_string
     elif header_locals != "" and locals == False:
@@ -246,10 +274,7 @@ def build_combined_header(parent_header_data, header_locals, csv_row_data, creat
             combined = csv_filtered
             return combined
 
-def update_fadgi_header(vtt_header_data, creation_date, nodefault):
-    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
-            'Originating File', 'File Creator', 'File Creation Date', 'Title',
-            'Origin History', 'Local Usage Element']
+def update_fadgi_header(vtt_header_data, creation_date, nodefault, keys):
     base_dict = dict.fromkeys(keys, "")
     default_hed = default_header(creation_date)
     if creation_date == "no_update":
@@ -295,184 +320,367 @@ def default_update():
                    }
     return ELMP_update
 
-def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefault):
-    for newvtt in glob.glob(f'{reviewed_dir}/*.vtt'):
-        justName = Path(newvtt).stem
-        outputName = justName + ".vtt"
-        print(f'\n{outputName}')
-        if platform.system() == 'Windows':
-            c_timestamp = os.path.getctime(newvtt)
-            datestamp = datetime.datetime.fromtimestamp(c_timestamp)
+def check_conformance(line_count, vtt_head, fileExt):
+    updated = False
+    webvtt_str = 'WEBVTT\n'
+    nl_str = '\n'
+    note_str = 'NOTE'
+    type_str = 'Type:'
+    webvtt_index = next((i for i, s in enumerate(vtt_head) if webvtt_str in s), -1)
+    nl_indices = [i for i, s in enumerate(vtt_head) if s == nl_str]
+    note_index = [i for i, s in enumerate(vtt_head) if s == note_str]
+    type_index = next((i for i, s in enumerate(vtt_head) if type_str in s), -1)
+    if webvtt_index != 0 and fileExt == '.vtt':
+        vtt_head.insert(0, webvtt_str)
+        updated = True
+    if 1 not in nl_indices and fileExt == '.vtt':
+        vtt_head.insert(1, nl_str)
+        updated = True
+    if 2 not in note_index and fileExt == '.vtt':
+        vtt_head.insert(2, note_str + '\n')
+        updated = True
+    if fileExt == '.txt' and not note_index:
+        vtt_head.insert(type_index, note_str + '\n')
+    if (line_count - 1) not in nl_indices:
+        vtt_head.append(nl_str)
+        updated = True
+    return vtt_head, updated
+
+def write_new_header(combined, outputDir, outputName, newvtt, line_count, fileExt, nodefault):
+    if 'Header' not in combined:
+        combined = {**{'Header': 'WEBVTT\n'}, **combined}
+    newfile = os.path.join(outputDir, outputName)
+    removed_value = combined.pop('File', 'Key not found')
+    newheader = list(combined.values())
+    newheader = [x for x in newheader if x != '']
+    to_remove = "\n"
+    newheader = [item.replace(to_remove, "") for item in newheader]
+    to_add = "\n"
+    newheader[0] = newheader[0] + to_add
+    newheader[-1] = newheader[-1] + to_add
+    blockstart = 'NOTE\n'
+    if blockstart not in newheader[1]:
+        newheader[1] = blockstart + newheader[1]
+    if fileExt == '.txt':
+        if newheader[0] == 'WEBVTT\n':
+            del newheader[0]
+        type_str = 'Type:'
+        type_index = next((i for i, s in enumerate(newheader) if type_str in s), -1)
+        if type_index != -1:
+            newheader[type_index] = newheader[type_index].replace('caption', 'transcript')
         else:
-            stat = os.stat(newvtt)
-            try:
-                timestamp = stat.st_birthtime
-                datestamp = datetime.datetime.fromtimestamp(timestamp)
-            except AttributeError:
-                timestamp = stat.st_mtime
-                datestamp = datetime.datetime.fromtimestamp(timestamp)
-        creation_date = datestamp.strftime("%Y-%m-%d")
-        line_count = get_header_line_count(newvtt)
-        if line_count == -1:
-            print('timestamps not found in file, skipping to next file\n')
-            continue
-        elif line_count == 2:
-            print('no FADGI header detected')
-            if m_csv != None:
-                print('checking csv for match...')
-                match_row = find_match(m_csv, outputName)
-                if match_row == -1 and nodefault == False:
-                    if reviewed == False:
-                        print('no match found, applying default unreviewed metadata')
-                        combined = default_header(creation_date)
-                    else:
-                        print('no match found, applying default reviewed metadata')
-                        default_head = default_header(creation_date)
-                        new_default = default_update()
-                        combined = default_head | new_default
-                elif match_row == -1 and nodefault == True:
-                    print('no match found and default metadata is not being applied, skipping to next file')
-                    continue
-                elif match_row != -1 and nodefault == False:
-                    print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                    csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                    if parentfile != '':
-                        print(f'contains parent info: {parentfile}, getting parent file header...')
-                        parent_head = assess_parent_header(parentfile, parent_dir)
-                        if parent_head == None:
-                            print('no parent file FADGI header')
-                            parent_header_data = ''
-                            header_locals = ''
-                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                        else:
-                            print('combining parent file header and metadata from csv...')
-                            parent_header_data, header_locals = get_header_data(parent_head)
-                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                            if reviewed == True:
-                                combined = change_reviewed(combined)
-                    else:
-                        parent_header_data = ''
-                        header_locals = ''
-                        combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                else:
-                    print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                    csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                    if parentfile != '':
-                        print(f'contains parent info: {parentfile}, getting parent file header...')
-                        parent_head = assess_parent_header(parentfile, parent_dir)
-                        if parent_head == None:
-                            print('no parent file FADGI header')
-                            parent_header_data = ''
-                            header_locals = ''
-                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                        else:
-                            print('combining parent file header and metadata from csv...')
-                            header_locals = ''
-                            parent_header_data, header_locals = get_header_data(parent_head)
-                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                            if reviewed == True:
-                                combined = change_reviewed(combined)
-                    else:
-                        parent_header_data = ''
-                        header_locals = ''
-                        combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
+            note_str = 'NOTE\n'
+            note_index = next((i for i, s in enumerate(newheader) if note_str in s), -1)
+            newheader[note_index] = newheader[note_index].replace(note_str, note_str + type_str + '\n')
+    elif fileExt == '.vtt':
+        type_str = 'Type: transcript'
+        type_index = next((i for i, s in enumerate(newheader) if type_str in s), -1)
+        if type_index != -1 and nodefault == True:
+            newheader[type_index] = newheader[type_index].replace('transcript', '')
+        elif type_index != -1 and nodefault == False:
+            newheader[type_index] = newheader[type_index].replace('transcript', 'caption')
+    with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+        for item in newheader:
+            f_out.write(f'{item}\n')
+        for _ in range(line_count):
+            next(f_in, None)
+        shutil.copyfileobj(f_in, f_out)
+    f_in.close()
+    f_out.close()
+    
+def merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals, keys):
+    if header_locals != '' and p_header_locals != '':
+        m_loc_str = merge_locals(header_locals, p_header_locals)
+    elif header_locals != '' and p_header_locals == '':
+        m_loc_str = header_locals
+    elif header_locals == '' and p_header_locals != '':
+        m_loc_str = p_header_locals
+    else:
+        m_loc_str = ''
+    base_dict = dict.fromkeys(keys, "")
+    parent_base = base_dict | parent_header_data
+    merged_header_data = parent_base | vtt_header_data
+    filtered_merged_header = {k:v for (k, v) in merged_header_data.items() if v}
+    return filtered_merged_header, m_loc_str
+
+def merge_locals(header_locals, p_header_locals):
+    header_locals = header_locals.replace("[", "")
+    header_dict = {k.strip(): v.strip() for k, v in (item.split(']') for item in header_locals.split(';'))}
+    p_header_locals = p_header_locals.replace("[", "")
+    p_header_dict = {k.strip(): v.strip() for k, v in (item.split(']') for item in p_header_locals.split(';'))}
+    merged_loc = {}
+    all_keys = set(p_header_dict.keys()) | set(header_dict.keys())
+    allowed_repeats = ['reviewer', 'reviewer_1', 'editing method', 'editing method_1']
+    if any(i in all_keys for i in allowed_repeats):
+        for k in allowed_repeats:
+            if k in header_dict and k in p_header_dict:
+                merged_loc[f'{k}_2'] = header_dict[k]
+                merged_loc[f'{k}_1'] = p_header_dict[k]
+                header_dict.pop(k, None)
+                p_header_dict.pop(k, None)
+    headers = p_header_dict | header_dict
+    merged_locals = headers | merged_loc
+    order = ['software version', 'review history',
+             'reviewer', 'editing method', 'reviewer_1', 'editing method_1',
+             'reviewer_2', 'editing method_2', 'parent file']
+    reordered_keys = {key: merged_locals[key] for key in order if key in merged_locals}
+    other_keys = {k: v for k, v in merged_locals.items() if k not in order}
+    merged_localz = {**reordered_keys, **other_keys}
+    m_loc_str = '; '.join(f'[{k}] {v}' for k, v in merged_localz.items())
+    return m_loc_str
+
+def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefault, keys):
+    ext = ['.vtt', '.txt']
+    for newvtt in glob.glob(f'{reviewed_dir}/*{ext}'):
+        if os.path.isfile(newvtt):
+            justName = Path(newvtt).stem
+            fileExt = Path(newvtt).suffix
+            if fileExt == '.vtt':
+                outputName = justName + ".vtt"
+                print(f'\n{outputName}')
+                pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+            elif fileExt == '.txt':
+                outputName = justName + ".txt"
+                print(f'\n{outputName}')
+                pattern = r'^Type:'
             else:
-                if nodefault == False:
-                    if reviewed == False:
-                        print('no csv and no header, using default unreviewed metadata')
-                        combined = default_header(creation_date)
-                    else:
-                        print('no csv and no header, using default reviewed metadata')
-                        default_head = default_header(creation_date)
-                        new_default = default_update()
-                        combined = default_head | new_default
-                else:
-                    print('no csv, no header, and default metadata is not being applied, skipping to next file')
-                    continue
-        else:
-            print(f'FADGI header detected: {line_count} lines')
-            vtt_head = assess_parent_header(newvtt, reviewed_dir)
-            vtt_header_data, header_locals = get_header_data(vtt_head)
-            if reviewed == False:
+                continue
+            if platform.system() == 'Windows':
+                c_timestamp = os.path.getctime(newvtt)
+                datestamp = datetime.datetime.fromtimestamp(c_timestamp)
+            else:
+                stat = os.stat(newvtt)
+                try:
+                    timestamp = stat.st_birthtime
+                    datestamp = datetime.datetime.fromtimestamp(timestamp)
+                except AttributeError:
+                    timestamp = stat.st_mtime
+                    datestamp = datetime.datetime.fromtimestamp(timestamp)
+            creation_date = datestamp.strftime("%Y-%m-%d")
+            line_count = get_header_line_count(newvtt, pattern, fileExt)
+            if line_count == -1:
+                print('timestamps not found in file, skipping to next file')
+                continue
+            elif (line_count == 2 and fileExt == '.vtt') or line_count == -2:
+                print('no FADGI header detected')
                 if m_csv != None:
                     print('checking csv for match...')
                     match_row = find_match(m_csv, outputName)
-                    if nodefault == True:
-                        if match_row == -1:
-                            print('no match found and default metadata is not being applied, skipping to next file')
-                            continue
-                        else:
-                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            creation_date = "no_update"
-                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                    else:
-                        if match_row == -1:
+                    if match_row == -1 and nodefault == False:
+                        if reviewed == False:
                             print('no match found, applying default unreviewed metadata')
+                            combined = default_header(creation_date)
+                        else:
+                            print('no match found, applying default reviewed metadata')
+                            default_head = default_header(creation_date)
+                            new_default = default_update()
+                            combined = default_head | new_default
+                    elif match_row == -1 and nodefault == True:
+                        print('no match found and default metadata is not being applied, skipping to next file')
+                        continue
+                    elif match_row != -1 and nodefault == False:
+                        print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                        csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                        if parentfile != '':
+                            print(f'contains parent info: {parentfile}, getting parent file header...')
+                            parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                            if parent_head == None:
+                                print('no parent file FADGI header')
+                                parent_header_data = ''
+                                header_locals = ''
+                                combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                            else:
+                                print('combining parent file header and metadata from csv...')
+                                parent_header_data, header_locals = get_header_data(parent_head)
+                                combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                if reviewed == True:
+                                    combined = change_reviewed(combined)
+                        else:
+                            parent_header_data = ''
+                            header_locals = ''
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                    else:
+                        print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                        creation_date = "no_update"
+                        csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                        if parentfile != '':
+                            print(f'contains parent info: {parentfile}, getting parent file header...')
+                            parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                            if parent_head == None:
+                                print('no parent file FADGI header')
+                                parent_header_data = ''
+                                header_locals = ''
+                                combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                            else:
+                                print('combining parent file header and metadata from csv...')
+                                header_locals = ''
+                                parent_header_data, header_locals = get_header_data(parent_head)
+                                combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                if reviewed == True:
+                                    combined = change_reviewed(combined)
+                        else:
+                            parent_header_data = ''
+                            header_locals = ''
+                            combined = build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                else:
+                    if nodefault == False:
+                        if reviewed == False:
+                            print('no csv and no header, using default unreviewed metadata')
+                            combined = default_header(creation_date)
+                        else:
+                            print('no csv and no header, using default reviewed metadata')
+                            default_head = default_header(creation_date)
+                            new_default = default_update()
+                            combined = default_head | new_default
+                    else:
+                        print('no csv, no header, and default metadata is not being applied, skipping to next file')
+                        continue
+            else:
+                vtt_head, lines = assess_parent_header(newvtt, reviewed_dir)
+                vtt_header_data, header_locals = get_header_data(vtt_head)
+                if reviewed == False:
+                    if m_csv != None:
+                        print('checking csv for match...')
+                        match_row = find_match(m_csv, outputName)
+                        if nodefault == True:
+                            if match_row == -1:
+                                print('no match found and default metadata is not being applied, skipping to next file')
+                                continue
+                            else:
+                                print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                                csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                                creation_date = "no_update"
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+#                                         header_locals = ''
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals, keys)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                        else:
+                            if match_row == -1:
+                                print('no match found, applying default unreviewed metadata')
+                                default_head = default_header(creation_date)
+                                combined = default_head | vtt_header_data
+                            else:
+                                print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                                csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                                creation_date = "no_update"
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals, keys)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                    else:
+                        if nodefault == True:
+                            print('no csv and default metadata is not being applied, checking conformance only')
+                            vtt_head_new, updated = check_conformance(line_count, vtt_head, fileExt)
+                            if updated == True:
+                                print('updating for FADGI conformance')
+                                newfile = os.path.join(outputDir, outputName)
+                                with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+                                    for item in vtt_head_new:
+                                        f_out.write(f'{item}')
+                                    if fileExt == '.vtt':
+                                        for _ in range(line_count):
+                                            next(f_in, None)
+                                    if fileExt == '.txt':
+                                        for _ in range(lines + 1):
+                                            next(f_in, None)
+                                    shutil.copyfileobj(f_in, f_out)
+                                f_in.close()
+                                f_out.close()
+                                continue
+                            else:
+                                print('file conforms, skipping to next file')
+                                continue
+                        else:
+                            print('no csv, using default unreviewed metadata')
+                            creation_date = "no_update"
                             default_head = default_header(creation_date)
                             combined = default_head | vtt_header_data
-                        else:
-                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
                 else:
-                    if nodefault == True:
-                        print('no csv and default metadata is not being applied, skipping to next file')
-                        continue
-                    else:
-                        print('no csv, using default unreviewed metadata')
-                        default_head = default_header(creation_date)
-                        combined = default_head | vtt_header_data
-            else:
-                print('changing review history to reviewed')
-                if m_csv != None:
-                    print('checking csv for match...')
-                    match_row = find_match(m_csv, outputName)
-                    if nodefault == False:
-                        if match_row == -1:
-                            print('no match found, applying default reviewed metadata')
-                            combined = update_fadgi_header(vtt_header_data, creation_date, nodefault)
+                    print('changing review history to reviewed')
+                    if m_csv != None:
+                        print('checking csv for match...')
+                        match_row = find_match(m_csv, outputName)
+                        if nodefault == False:
+                            if match_row == -1:
+                                print('no match found, applying default reviewed metadata')
+                                combined = update_fadgi_header(vtt_header_data, creation_date, nodefault, keys)
+                            else:
+                                print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                                csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                                creation_date = "no_update"
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                        combined = change_reviewed(combined)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+#                                         header_locals = ''
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals, keys)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                        combined = change_reviewed(combined)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                    combined = change_reviewed(combined)
                         else:
-                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                            combined = change_reviewed(combined)
+                            if match_row == -1:
+                                print('no match found and default metadata is not being applied, only updating review history')
+                                combined = change_reviewed(vtt_header_data)
+                            else:
+                                print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
+                                csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
+                                creation_date = "no_update"
+                                if parentfile != '':
+                                    print(f'contains parent info: {parentfile}, getting parent file header...')
+                                    parent_head, lines = assess_parent_header(parentfile, parent_dir)
+                                    if parent_head == None:
+                                        print('no parent file FADGI header')
+                                        combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                        combined = change_reviewed(combined)
+                                    else:
+                                        print('combining source header, parent file header, and metadata from csv...')
+#                                         header_locals = ''
+                                        parent_header_data, p_header_locals = get_header_data(parent_head)
+                                        merged_header_data, header_locals = merge_headers(vtt_header_data, header_locals, parent_header_data, p_header_locals, keys)
+                                        combined = build_combined_header(merged_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                        combined = change_reviewed(combined)
+                                else:
+                                    combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
+                                    combined = change_reviewed(combined)
+                    elif m_csv == None and nodefault == False:
+                        print('no csv, using default reviewed metadata')
+                        creation_date = "no_update"
+                        combined = update_fadgi_header(vtt_header_data, creation_date, nodefault, keys)
                     else:
-                        if match_row == -1:
-                            print('no match found and default metadata is not being applied, only updating review history')
-                            combined = change_reviewed(vtt_header_data)
-                        else:
-                            print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
-                            csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
-                            combined = build_combined_header(vtt_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault)
-                            combined = change_reviewed(combined)
-                elif m_csv == None and nodefault == False:
-                    print('no csv, using default reviewed metadata')
-                    creation_date = "no_update"
-                    combined = update_fadgi_header(vtt_header_data, creation_date, nodefault)
-                else:
-                    print('no csv and default metadata is not being applied, only updating review history')
-                    combined = change_reviewed(vtt_header_data)
-        
-        if 'Header' not in combined:
-            combined = {**{'Header': 'WEBVTT\n'}, **combined}
-        newfile = os.path.join(outputDir, outputName)
-        removed_value = combined.pop('File', 'Key not found')
-        newheader = list(combined.values())
-        newheader = [x for x in newheader if x != '']
-        to_remove = "\n"
-        newheader = [item.replace(to_remove, "") for item in newheader]
-        to_add = "\n"
-        newheader[0] = newheader[0] + to_add
-        newheader[-1] = newheader[-1] + to_add
-        with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
-            for item in newheader:
-                f_out.write(f'{item}\n')
-            for _ in range(line_count):
-                next(f_in, None)
-            shutil.copyfileobj(f_in, f_out)
-        f_in.close()
-        f_out.close()
+                        print('no csv and default metadata is not being applied, only updating review history')
+                        combined = change_reviewed(vtt_header_data)
+            if fileExt == '.txt' and line_count != -2:
+                line_count = lines + 1
+            write_new_header(combined, outputDir, outputName, newvtt, line_count, fileExt, nodefault)
+        else:
+            continue
 
 def main(args_):
     args = setup(args_)
@@ -480,6 +688,9 @@ def main(args_):
     parent_dir = args.parentfiles
     emorydefault = args.emorydefault
     reviewed = args.reviewed
+    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
+            'Originating File', 'File Creator', 'File Creation Date', 'Title',
+            'Origin History', 'Local Usage Element']
     print('*** webvtt metadata - settings chosen: ***')
     print(f'reviewed vtt directory:\n\t{reviewed_dir}')
     if args.csv != None:
@@ -493,19 +704,19 @@ def main(args_):
     else:
         print('directory of parent files:\n\tno parent file directory provided')
     if reviewed == True:
-        print('webvtt files are: reviewed\n\tscript will create/update reviewed FADGI headers\n\t(will update "review history" to "human-reviewed"\n\tor create this element if it doesn\'t exist)')
+        print('webvtt files are: reviewed\n\tscript will update "review history" to "human-reviewed"\n\t(if default is selected, will also create this element if it doesn\'t exist)')
     else:
         print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand skip files with existing FADGI headers')
     if emorydefault == True:
-        print('default metadata:\n\tscript will use Emory default metadata set for empty fields')
+        print('default metadata: true\n\tscript will use Emory default metadata set for empty fields')
         nodefault = False
     else:
-        print('default metadata:\n\tscript will not use Emory default metadata set for empty fields')
+        print('default metadata: false\n\tscript will not use Emory default metadata set for empty fields')
         nodefault = True
     outputDir = make_output_dir(reviewed_dir)
     proceed = ask_yes_no('proceed with these settings?')
     if proceed =='Y':
-        update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefault)
+        update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, nodefault, keys)
     else:
         print('exiting. goodbye!')
         sys.exit()

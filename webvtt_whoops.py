@@ -22,6 +22,12 @@ def setup(args_):
         'source',
         help='directory of files'
     )
+    parser.add_argument(
+        "-t",
+        "--txtheader",
+        action="store_true",
+        help="apply to txt files also"
+        )
     args = parser.parse_args(args_)
     return args
 
@@ -101,10 +107,10 @@ def get_csv_info(source, element_choice, outputDir, localYN):
             print('CSV is empty or has no headers.\n')
             return
 
-def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
+def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header):
     if localYN == 'Y':
         element_choice = 'Local Usage Element: ' + element_choice
-    if m_csv == "":
+    if m_csv == "" and element_choice != 'NOTE':
         while True:
             bulk_val = input(f'\n\n**** Input new element value to apply for field "{element_choice}":     ')
             proceed_yn = ask_yes_no(f'New value: "{bulk_val}". Update header line to "{element_choice}: {bulk_val}" for all WebVTT files in directory?')
@@ -113,36 +119,66 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN):
             else:
                 print('\nReturning to menu.')
                 return
-    for vttfile in glob.glob(f'{source}/*.vtt'):
-        justName = Path(vttfile).stem
-        outputName = justName + ".vtt"
-        count = count_file_header(vttfile)
-        elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
-        if elementline == "":
-            print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
-            continue
-        if line_count != -1:
-            print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-        if m_csv != "":
-            new_val = find_file(outputName, m_csv, col_index)
-        else:
-            new_val = bulk_val
-        if elementline.endswith('\n'):
-            new_val = element_choice + ': ' + new_val + '\n'
-        print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
-        new_head = [new_val if x == elementline else x for x in orig_head]
-        newfile = os.path.join(outputDir, outputName)
-        with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
-            for item in new_head:
-                f_out.write(item)
-            for _ in range(line_count+1):
-                next(f_in, None)
-            shutil.copyfileobj(f_in, f_out)
-        f_in.close()
-        f_out.close()
+    ext = ['.vtt', '.txt']
+    for vttfile in glob.glob(f'{source}/*{ext}'):
+        if os.path.isfile(vttfile):
+            justName = Path(vttfile).stem
+            fileExt = Path(vttfile).suffix
+            if fileExt == '.vtt':
+                outputName = justName + ".vtt"
+                print(outputName)
+                pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+            elif fileExt == '.txt' and txt_header == True:
+                outputName = justName + ".txt"
+                print(outputName)
+                pattern = r'^Local Usage Element:'
+            else:
+                continue
+            count = count_file_header(vttfile, pattern)
+            elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+            if element_choice == 'NOTE':
+                line_count = count - 1
+                if elementline == "":
+                    print(f'{outputName}: "{element_choice}" not found, adding to header')
+                    try:
+                        index = [i for i, s in enumerate(orig_head) if 'Type' in s]
+                    except ValueError:
+                        print('error: not found')
+                    if index:
+                        index_int = index[0]
+                    else:
+                        index_int = 0
+                    new_val = 'NOTE\n'
+                    orig_head.insert(index_int, new_val)
+                    new_head = orig_head
+                elif elementline != "":
+                    print(f'{outputName}: "{element_choice}" found in header, skipping file.')
+                    continue
+            else:
+                if elementline == "":
+                    print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
+                    continue
+                if line_count != -1:
+                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+                if m_csv != "":
+                    new_val = find_file(outputName, m_csv, col_index)
+                else:
+                    new_val = bulk_val
+                if elementline.endswith('\n'):
+                    new_val = element_choice + ': ' + new_val + '\n'
+                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
+                new_head = [new_val if x == elementline else x for x in orig_head]
+            newfile = os.path.join(outputDir, outputName)
+            with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+                for item in new_head:
+                    f_out.write(item)
+                for _ in range(line_count+1):
+                    next(f_in, None)
+                shutil.copyfileobj(f_in, f_out)
+            f_in.close()
+            f_out.close()
         
-def count_file_header(vttfile):
-    pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+def count_file_header(vttfile, pattern):
     count = 0
     try:
         with open(vttfile, 'r', encoding='UTF-8') as input:
@@ -197,6 +233,7 @@ def main_menu(source):
     print('8. Title')
     print('9. Origin History')
     print('10. Local Usage Element (any)')
+    print('N. Add NOTE if missing from header')
     print('Q. Quit')
 
 def main(args_):
@@ -205,6 +242,12 @@ def main(args_):
     if not os.path.isdir(source):
         print(f"No directory {source} exists, exiting program.")
         sys.exit()
+    if args.txtheader == True:
+        print("\nActions will be applied to txt and vtt files.")
+        txt_header = True
+    else:
+        print("\nActions will be applied to vtt files.")
+        txt_header = False
     outputDir = make_output_dir(source)
     while True:
         main_menu(source)
@@ -230,7 +273,13 @@ def main(args_):
                 else:
                     print('\nReturning to menu.')
                     break
-        elif choice == 'Q':
+        elif choice.upper() == 'N':
+            localYN = 'N'
+            m_csv = ""
+            element_choice = 'NOTE'
+            col_index = ""
+            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+        elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
             break
         else:
