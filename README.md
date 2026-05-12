@@ -1,8 +1,15 @@
 # webvtt_metadata
 Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 0.1)](https://www.digitizationguidelines.gov/guidelines/FADGI_WebVTT_embed_guidelines_v0.1_2024-04-18.pdf), using a csv template file, header data from an associated parent file, and/or a default metadata set. The script does not overwrite the input WebVTT files; output is written to a new folder that is created inside the input folder.
 
+## Update
+The script now also works with plain text (.txt) files. It will apply FADGI metadata in the same way as for WebVTT files, with these exceptions:
+- instead of finding existing header data by searching for the first timecode cue, it searches .txt files for the "Type" element
+- if a header is found, it counts header length as the number of lines from the file start to second blank line (if it exists, or first blank if not)
+- if the existing header has a "Type" value of "caption", the script changes this to "transcript" if emorydefault is selected or to "" if not
+
+
 ## Usage
-The only required input is the path to the folder of input WebVTT files:
+The only required input is the path to the folder of input files:
 
 ```webvtt_metadata.py [path/to/inputfolder]```
 
@@ -12,7 +19,7 @@ Command options:
 - ``-r`` or ``--reviewed``: Creates/updates FADGI header for human-reviewed input files
 - ``-p`` or ``--parentfiles`` ``[path/to/parentfolder]``: Check directory of parent files for associated header data (requires CSV to match input WebVTT file with parent WebVTT file)
 
-
+For non-local elements, the script uses metadata from the csv first, then from the source header, then from the parent header; local elements merge in the same way except metadata for [reviewer] and [editing method] are retained from each source.
 
 ## CSV template
 The template includes all strongly recommended elements and optional elements:
