@@ -12,16 +12,16 @@ import argparse
 import shutil
 from itertools import zip_longest
 
-sys.argv = [
-    'webvtt_metadata.py',
-    '/Users/nraogra/Desktop/txt-test',
-    '-c',
-    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
+#sys.argv = [
+#    'webvtt_metadata.py',
+#    '/Users/nraogra/Desktop/txt-test',
+#    '-c',
+#    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
 #     '-r',
 #     '-e',
-    '-p', 
-    '/Users/nraogra/Desktop/txt-test',
-    ]
+#    '-p', 
+#    '/Users/nraogra/Desktop/txt-test',
+#    ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
