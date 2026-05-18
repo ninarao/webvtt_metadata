@@ -5,7 +5,7 @@ Python program that writes metadata to WebVTT files according to the [FADGI Guid
 The script now also works with plain text (.txt) files. It will apply FADGI metadata in the same way as for WebVTT files, with these exceptions:
 - instead of finding existing header data by searching for the first timecode cue, it searches .txt files for the "Type" element
 - if a header is found, it counts header length as the number of lines from the file start to second blank line (if it exists, or first blank if not)
-- if the existing header has a "Type" value of "caption", the script changes this to "transcript" if emorydefault is selected or to "" if not
+- if the existing header has a "Type" value of "caption", the script changes this value to "transcript" if ``--emorydefault`` is selected or to "" if not
 
 
 ## Usage
@@ -16,7 +16,7 @@ The only required input is the path to the folder of input files:
 Command options:
 - ``-c`` or ``--csv`` ``[path/to/webvtt_metadata.csv]``: Include metadata from a CSV
 - ``-e`` or ``--emorydefault``: Use Emory default metadata set for empty metadata elements
-- ``-r`` or ``--reviewed``: Creates/updates FADGI header for human-reviewed input files
+- ``-r`` or ``--reviewed``: Updates "review history" value to "human-reviewed" for files with an existing FADGI header (if ``-e`` is selected, it will also create this element if it doesn't exist)
 - ``-p`` or ``--parentfiles`` ``[path/to/parentfolder]``: Check directory of parent files for associated header data (requires CSV to match input WebVTT file with parent WebVTT file)
 
 For non-local elements, the script uses metadata from the csv first, then from the source header, then from the parent header; local elements merge in the same way except metadata for [reviewer] and [editing method] are retained from each source.
