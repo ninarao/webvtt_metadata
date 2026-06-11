@@ -10,13 +10,13 @@ import datetime
 import re
 import argparse
 import shutil
-from itertools import zip_longest
+from itertools import zip_longest, islice
 
-#sys.argv = [
+# sys.argv = [
 #    'webvtt_metadata.py',
-#    '/Users/nraogra/Desktop/txt-test',
+#    '/Users/nraogra/Downloads/OneDrive_1_6-10-2026',
 #    '-c',
-#    '/Users/nraogra/Desktop/txt-test/webvtt_metadata.csv',
+#    '/Users/nraogra/Downloads/CaptionFiles-Captionfilerecords.csv',
 #     '-r',
 #     '-e',
 #    '-p', 
@@ -147,15 +147,13 @@ def assess_parent_header(parentfile, parent_dir):
             matches = []
             nl_str = '\n'
             with open(vttfile, 'r', encoding='UTF-8') as input:
-                for line_num, line in enumerate(input, 0):
+                for line_num, line in enumerate(islice(input, lines, None)):
                     if line == nl_str:
                         matches.append(line_num)
-                        if len(matches) == 2:
+                        if len(matches) == 1:
                             break
             if len(matches) == 1:
-                lines = matches[0]
-            elif len(matches) == 2:
-                lines = matches[1]
+                lines = matches[0] + 1
         if lines == -1:
             print('timestamps not found in parent file')
             parent_head = None
@@ -192,9 +190,16 @@ def get_header_data(parent_head):
             del parent_head[index]
     else:
         header_locals = ""
+    for index, item in enumerate(parent_head):
+        if ':' not in item:
+            parent_head[index] = item + ':' + item
     header_keys = dict(item.split(':', 1) for item in parent_head)
     header_keys = list({k.strip(): v.strip() for k, v in header_keys.items()})
     header_data = dict(zip(header_keys, values_list))
+    note_key = [k for k, v in header_data.items() if 'NOTE' in v]
+    if note_key:
+        header_data[note_key[0]] = 'NOTE\n'
+        header_data['Note'] = header_data.pop(note_key[0])
     if indices:
         header_data["Local Usage Element"] = local_string
     if 'Header' in header_data:
@@ -358,9 +363,11 @@ def write_new_header(combined, outputDir, outputName, newvtt, line_count, fileEx
     to_add = "\n"
     newheader[0] = newheader[0] + to_add
     newheader[-1] = newheader[-1] + to_add
-    blockstart = 'NOTE\n'
+    blockstart = 'NOTE'
+    if blockstart in newheader:
+        newheader.insert(1, newheader.pop(newheader.index(blockstart)))
     if blockstart not in newheader[1]:
-        newheader[1] = blockstart + newheader[1]
+        newheader[1] = blockstart + '\n' + newheader[1]
     if fileExt == '.txt':
         if newheader[0] == 'WEBVTT\n':
             del newheader[0]
@@ -688,9 +695,9 @@ def main(args_):
     parent_dir = args.parentfiles
     emorydefault = args.emorydefault
     reviewed = args.reviewed
-    keys = ['Header', 'Type', 'Language', 'Responsible Party', 'Media Identifier',
-            'Originating File', 'File Creator', 'File Creation Date', 'Title',
-            'Origin History', 'Local Usage Element']
+    keys = ['Header', 'Note', 'Type', 'Language', 'Responsible Party',
+            'Media Identifier', 'Originating File', 'File Creator',
+            'File Creation Date', 'Title', 'Origin History', 'Local Usage Element']
     print('*** webvtt metadata - settings chosen: ***')
     print(f'reviewed vtt directory:\n\t{reviewed_dir}')
     if args.csv != None:
