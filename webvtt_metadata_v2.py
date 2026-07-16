@@ -13,7 +13,7 @@ import shutil
 from itertools import zip_longest, islice, chain
 
 match_row = 3
-m_csv = '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_parent.csv'
+m_csv = '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv'
 vttfile = '/Users/nraogra/Desktop/webvtt_v2/934_B21_005_SideA_rev.vtt'
 parentfile = '/Users/nraogra/Desktop//webvtt_v2/934_B21_005_SideA.vtt'
 
@@ -80,6 +80,9 @@ def get_header_data(parent_head):
     return header_data, header_locals
     
 def merge_headers(vtt_header_data, parent_header_data):
+    if not any('File Creation Date' in t[0] for t in vtt_header_data):
+        if any('File Creation Date' in t[0] for t in parent_header_data):
+            parent_header_data = [t for t in parent_header_data if t[0] != 'File Creation Date']
     vtt_locals = list({t for t in vtt_header_data if t and t[0].startswith('_')})
     p_locals = {t for t in parent_header_data if t and t[0].startswith('_')}
     vtt_nonlocal = list({t for t in vtt_header_data if t and not t[0].startswith('_')})
@@ -94,79 +97,65 @@ def merge_headers(vtt_header_data, parent_header_data):
     merged_locals = vtt_locals + dedupe_append
     return merged_header_data, merged_locals
 
-def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault, keys):
-    base_dict = dict.fromkeys(keys, "")
+def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
 #     base_tupes = [(x, '') for x in keys]
-    default_head = default_header(creation_date)
-    if reviewed == True:
-        new_default = default_update()
-        default_head = default_head | new_default
-    csv_row_data = {k:v for k, v in csv_row_data.items() if v != ''}
-    localkeys = r'^Local Usage Element \d+ Key'
-    keymatches = {}
-    localvals = r'^Local Usage Element \d+ Value'
-    valmatches = {}
-    for key, value in csv_row_data.items():
-        if re.search(localkeys, key):
-            keymatches[key] = value
-    for key, value in csv_row_data.items():
-        if re.search(localvals, key):
-            valmatches[key] = value
-    if keymatches and valmatches:
-        keyslist = list(keymatches.values())
-        keyslist_formatted = ["[" + item + "]" for item in keyslist]
-        valslist = list(valmatches.values())
-        locals = dict(zip(keyslist_formatted, valslist))
-        local_list = [f"{k} {v}" for k, v in locals.items()]
-        local_string = "; ".join(map(str, local_list))
-        locals = True
-    else:
+    csv_row_data = [t for t in csv_row_data if t[1] != '']
+    csv_locals = list({t for t in csv_row_data if t and t[0].startswith('_')})
+#     print(f'csv_locals: {csv_locals}')
+    if csv_locals == []:
         locals = False
-    easy_keysie = ["Language", "Type", "Responsible Party", "Originating File",
-                   "File Creator", "Title", "Origin History"]
-    for key in easy_keysie:
-        if key in csv_row_data:
-            csv_row_data[key] = key + ": " + csv_row_data[key]
-    if csv_row_data.get("Media Identifier") and csv_row_data.get("Media Identifier Type"):
-        csv_row_data["Media Identifier"] = "Media Identifier: " + csv_row_data["Media Identifier"] + ", " + csv_row_data["Media Identifier Type"]
-    elif csv_row_data.get("Media Identifier") and not csv_row_data.get("Media Identifier Type"):
-        csv_row_data["Media Identifier"] = "Media Identifier: " + csv_row_data["Media Identifier"]
-    if csv_row_data.get("File Creation Date"):
-        csv_row_data["File Creation Date"] = "File Creation Date: " + csv_row_data["File Creation Date"]
     else:
-        csv_row_data["File Creation Date"] = "File Creation Date: " + creation_date
-    keys_to_keep = ["Language", "Type", "Responsible Party", "Media Identifier", 
-                   "Originating File", "File Creator", "Title", "Origin History",
-                    "File Creation Date"]
-    csv_keys_kept = {k:v for k, v in csv_row_data.items() if k in keys_to_keep}
-    csv_filtered = {k:v for (k, v) in csv_keys_kept.items() if v}
-    if header_locals != "" and locals == True:
-        merged_locals = merge_locals(local_string, header_locals)
-        csv_filtered["Local Usage Element"] = "Local Usage Element: " + merged_locals
-    elif header_locals == "" and locals == True:
-        csv_filtered["Local Usage Element"] = "Local Usage Element: " + local_string
-    elif header_locals != "" and locals == False:
-        csv_filtered["Local Usage Element"] = "Local Usage Element: " + header_locals
-    if creation_date == "no_update":
-        csv_filtered.pop("File Creation Date", None)
+        locals = True
+#     print(f'csv_locals found? {locals}')
+    if not any('File Creation Date' in t[0] for t in csv_row_data):
+        if any('File Creation Date' in t[0] for t in parent_header_data):
+            header_date = next((v for k, v in parent_header_data if k == 'File Creation Date'), '')
+            csv_row_data.append(('File Creation Date', header_date))
+#         elif creation_date != 'no_update':
+#             csv_row_data.append(('File Creation Date', creation_date))
+    combined_header_data, combined_locals = merge_headers(csv_row_data, parent_header_data)
+#     print(f'combined_header_data: {combined_header_data}')
+#     print(f'combined_locals: {combined_locals}')
     if nodefault == False:
-        default = base_dict | default_head
-        if parent_header_data != '':
-            parent_filtered = {k:v for (k, v) in parent_header_data.items() if v}
-            combined = default | parent_filtered
-            combined = combined | csv_filtered
-            return combined
-        else:
-            combined = default | csv_filtered
-            return combined
-    else:
-        if parent_header_data != '':
-            parent_filtered = {k:v for (k, v) in parent_header_data.items() if v}
-            combined = parent_filtered | csv_filtered
-            return combined
-        else:
-            combined = csv_filtered
-            return combined
+        if not any('Type' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Type', 'caption'))
+        if not any('Language' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Language', 'eng'))
+        if not any('Responsible Party' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Responsible Party', 'US, Emory University'))
+        if not any('Media Identifier' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Media Identifier', 'unknown'))
+        if not any('Originating File' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Originating File', 'unknown'))
+        if not any('File Creator' in t[0] for t in combined_header_data):
+            combined_header_data.append(('File Creator', 'Whisper'))
+        if not any('File Creation Date' in t[0] for t in combined_header_data):
+            combined_header_data.append(('File Creation Date', creation_date))
+        if not any('Title' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Title', 'unknown'))
+        if not any('Origin History' in t[0] for t in combined_header_data):
+            combined_header_data.append(('Origin History', 'Created by Emory Libraries Media Preservation'))
+    if nodefault == False and reviewed == False:
+        if not any('_Review history' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Review history', 'unreviewed'))
+            combined_locals.append(('_Review history', 'unreviewed'))
+        if not any('_Parent File' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Parent File', 'unknown'))
+            combined_locals.append(('_Parent File', 'unknown'))
+    if nodefault == False and reviewed == True:
+        if not any('_Review history' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Review history', 'human-reviewed'))
+            combined_locals.append(('_Review history', 'human-reviewed'))
+        if not any('_Reviewer' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Reviewer', 'unknown'))
+            combined_locals.append(('_Reviewer', 'unknown'))
+        if not any('_Editing Method' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Editing Method', 'unknown'))
+            combined_locals.append(('_Editing Method', 'unknown'))
+        if not any('_Parent File' in t[0] for t in combined_header_data):
+            combined_header_data.append(('_Parent File', 'unknown'))
+            combined_locals.append(('_Parent File', 'unknown'))
+    return combined_header_data
 
 with open(vttfile, 'r', encoding='UTF-8') as input:
     vtt_head = [next(input) for _ in range(15)]
@@ -185,11 +174,13 @@ parent_header_data, p_header_locals = get_header_data(parent_head)
 
 merged_header_data, merged_locals = merge_headers(vtt_header_data, parent_header_data)
 
-creation_date = ''
+creation_date = 'today'
 reviewed = False
 nodefault = True
-keys = ''
 
-build_combined_header(merged_header_data, merged_locals, csv_row_data, creation_date, reviewed, nodefault, keys)
-    
+combined = build_combined_header(merged_header_data, merged_locals, csv_row_data, creation_date, reviewed, nodefault)
+print(f'combined: {combined}')
+
+
+
     
