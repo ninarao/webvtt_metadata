@@ -17,17 +17,6 @@ m_csv = '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv'
 vttfile = '/Users/nraogra/Desktop/webvtt_v2/934_B21_005_SideA_rev.vtt'
 parentfile = '/Users/nraogra/Desktop//webvtt_v2/934_B21_005_SideA.vtt'
 
-# elements (repeatable?)
-#     Type (no)
-#     Language (yes)
-#     Responsible Party (yes)
-#     Media Identifier (yes)
-#     Originating File (no)
-#     File Creator (yes)
-#     File Creation Date (no)
-#     Title (no)
-#     Origin History (yes)
-#     Local (yes)
 
 def get_csv_metadata(match_row, m_csv):
     with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
@@ -74,8 +63,8 @@ def get_header_data(parent_head):
             parent_head[index] = item + ': ' + item
     parent_head_tuples = [tuple(x.split(': ', 1)) for x in parent_head]
     note_tuple = ('NOTE', 'NOTE')
-    if note_tuple in parent_head_tuples:
-        parent_head_tuples.remove(note_tuple)
+#     if note_tuple in parent_head_tuples:
+#         parent_head_tuples.remove(note_tuple)
     header_data = parent_head_tuples
     return header_data, header_locals
     
@@ -99,21 +88,21 @@ def merge_headers(vtt_header_data, parent_header_data):
 
 def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
 #     base_tupes = [(x, '') for x in keys]
-    csv_row_data = [t for t in csv_row_data if t[1] != '']
-    csv_locals = list({t for t in csv_row_data if t and t[0].startswith('_')})
-#     print(f'csv_locals: {csv_locals}')
-    if csv_locals == []:
-        locals = False
+    if csv_row_data != '':
+        csv_row_data = [t for t in csv_row_data if t[1] != '']
+        csv_locals = list({t for t in csv_row_data if t and t[0].startswith('_')})
+        if csv_locals == []:
+            locals = False
+        else:
+            locals = True
+        if not any('File Creation Date' in t[0] for t in csv_row_data):
+            if any('File Creation Date' in t[0] for t in parent_header_data):
+                header_date = next((v for k, v in parent_header_data if k == 'File Creation Date'), '')
+                csv_row_data.append(('File Creation Date', header_date))
+        combined_header_data, combined_locals = merge_headers(csv_row_data, parent_header_data)
     else:
-        locals = True
-#     print(f'csv_locals found? {locals}')
-    if not any('File Creation Date' in t[0] for t in csv_row_data):
-        if any('File Creation Date' in t[0] for t in parent_header_data):
-            header_date = next((v for k, v in parent_header_data if k == 'File Creation Date'), '')
-            csv_row_data.append(('File Creation Date', header_date))
-#         elif creation_date != 'no_update':
-#             csv_row_data.append(('File Creation Date', creation_date))
-    combined_header_data, combined_locals = merge_headers(csv_row_data, parent_header_data)
+        combined_header_data = parent_header_data
+        combined_locals = header_locals
 #     print(f'combined_header_data: {combined_header_data}')
 #     print(f'combined_locals: {combined_locals}')
     if nodefault == False:
@@ -155,7 +144,71 @@ def build_combined_header(parent_header_data, header_locals, csv_row_data, creat
         if not any('_Parent File' in t[0] for t in combined_header_data):
             combined_header_data.append(('_Parent File', 'unknown'))
             combined_locals.append(('_Parent File', 'unknown'))
+    if nodefault == True and reviewed == True:
+        if any('_Review history' in t[0] for t in combined_header_data):
+            combined_header_data = [(t[0], 'human-reviewed') if t[0] == '_Review history' else t for t in combined_header_data]
+            combined_locals= [(t[0], 'human-reviewed') if t[0] == '_Review history' else t for t in combined_locals]
+        else:
+            combined_header_data.append(('_Review history', 'human-reviewed'))
+            combined_locals.append(('_Review history', 'human-reviewed'))
+        
     return combined_header_data
+
+def check_conformance(line_count, vtt_head, fileExt):
+    updated = False
+    ref_list = ['Header', 'Note', 'Type', 'Language', 'Responsible Party',
+            'Media Identifier', 'Originating File', 'File Creator',
+            'File Creation Date', 'Title', 'Origin History']
+    order_map = {key.lower(): index for index, key in enumerate(ref_list)}
+    sorted_tupes = sorted(vtt_head, key=lambda x: (order_map.get(x[0].lower(), float('inf')), x[0].lower(), id(x)))
+    print(f'sorted_tupes: {sorted_tupes}')
+
+    webvtt_str = 'WEBVTT'
+    nl_str = '\n'
+    note_str = 'NOTE'
+    type_str = 'Type'
+    
+    webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() in s[1].casefold()), -1)
+    print(f'webvtt_index: {webvtt_index}')
+    note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() in s[1].casefold()), -1)
+    print(f'note_index: {note_index}')
+    type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
+    print(f'type_index: {type_index}')
+    
+    if fileExt == '.vtt':
+        if webvtt_index == -1:
+            vtt_head.insert(0, ('Header', 'WEBVTT'))
+            updated = True
+        elif webvtt_index != 0:
+            item = vtt_head.pop(webvtt_index)
+            vtt_head.insert(0, item)
+            
+    if 1 not in nl_indices and fileExt == '.vtt':
+        vtt_head.insert(1, nl_str)
+        updated = True
+    if 2 not in note_index and fileExt == '.vtt':
+        vtt_head.insert(2, note_str + '\n')
+        updated = True
+    if fileExt == '.txt' and not note_index:
+        vtt_head.insert(type_index, note_str + '\n')
+    if (line_count - 1) not in nl_indices:
+        vtt_head.append(nl_str)
+        updated = True
+    return vtt_head, updated
+
+
+#     Type (no)
+#     Language (yes)
+#     Responsible Party (yes)
+#     Media Identifier (yes)
+#     Originating File (no)
+#     File Creator (yes)
+#     File Creation Date (no)
+#     Title (no)
+#     Origin History (yes)
+
+
+
 
 with open(vttfile, 'r', encoding='UTF-8') as input:
     vtt_head = [next(input) for _ in range(15)]
@@ -169,7 +222,7 @@ csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
 
 vtt_header_data, header_locals = get_header_data(vtt_head)
 parent_header_data, p_header_locals = get_header_data(parent_head)
-# print(f'vtt_header_data: {vtt_header_data}')
+print(f'vtt_header_data: {vtt_header_data}')
 # print(f'header_locals: {header_locals}')
 
 merged_header_data, merged_locals = merge_headers(vtt_header_data, parent_header_data)
@@ -177,10 +230,17 @@ merged_header_data, merged_locals = merge_headers(vtt_header_data, parent_header
 creation_date = 'today'
 reviewed = False
 nodefault = True
+csv_row_data = ''
+# merged_header_data = []
+# merged_locals = []
 
 combined = build_combined_header(merged_header_data, merged_locals, csv_row_data, creation_date, reviewed, nodefault)
-print(f'combined: {combined}')
+# print(f'combined: {combined}')
 
+vtt_head = combined
+line_count = 15
+fileExt = '.vtt'
 
+vtt_head_new, updated = check_conformance(line_count, vtt_head, fileExt)
 
     
