@@ -62,9 +62,6 @@ def get_header_data(parent_head):
         if ':' not in item:
             parent_head[index] = item + ': ' + item
     parent_head_tuples = [tuple(x.split(': ', 1)) for x in parent_head]
-    note_tuple = ('NOTE', 'NOTE')
-#     if note_tuple in parent_head_tuples:
-#         parent_head_tuples.remove(note_tuple)
     header_data = parent_head_tuples
     return header_data, header_locals
     
@@ -87,7 +84,6 @@ def merge_headers(vtt_header_data, parent_header_data):
     return merged_header_data, merged_locals
 
 def build_combined_header(parent_header_data, header_locals, csv_row_data, creation_date, reviewed, nodefault):
-#     base_tupes = [(x, '') for x in keys]
     if csv_row_data != '':
         csv_row_data = [t for t in csv_row_data if t[1] != '']
         csv_locals = list({t for t in csv_row_data if t and t[0].startswith('_')})
@@ -103,8 +99,7 @@ def build_combined_header(parent_header_data, header_locals, csv_row_data, creat
     else:
         combined_header_data = parent_header_data
         combined_locals = header_locals
-#     print(f'combined_header_data: {combined_header_data}')
-#     print(f'combined_locals: {combined_locals}')
+
     if nodefault == False:
         if not any('Type' in t[0] for t in combined_header_data):
             combined_header_data.append(('Type', 'caption'))
@@ -154,22 +149,19 @@ def build_combined_header(parent_header_data, header_locals, csv_row_data, creat
         
     return combined_header_data
 
-def check_conformance(line_count, vtt_head, fileExt):
-    updated = False
+def check_conformance(vtt_head, fileExt):
     ref_list = ['Header', 'Note', 'Type', 'Language', 'Responsible Party',
             'Media Identifier', 'Originating File', 'File Creator',
             'File Creation Date', 'Title', 'Origin History']
     order_map = {key.lower(): index for index, key in enumerate(ref_list)}
     sorted_tupes = sorted(vtt_head, key=lambda x: (order_map.get(x[0].lower(), float('inf')), x[0].lower(), id(x)))
-    print(f'sorted_tupes: {sorted_tupes}')
-
+    
     webvtt_str = 'WEBVTT'
     note_str = 'NOTE'
     type_str = 'Type'
     
-    webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() in s[1].casefold()), -1)
-    print(f'webvtt_index: {webvtt_index}')
     if fileExt == '.vtt':
+        webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() in s[1].casefold()), -1)    
         if webvtt_index == -1:
             sorted_tupes.insert(0, ('', 'WEBVTT'))
         else:
@@ -179,10 +171,7 @@ def check_conformance(line_count, vtt_head, fileExt):
                 item = sorted_tupes.pop(webvtt_index)
                 sorted_tupes.insert(0, item)
         sorted_tupes.insert(1, ('', '\n'))
-    
-    note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() in s[1].casefold()), -1)
-    print(f'note_index: {note_index}')
-    if fileExt == '.vtt':
+        note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() in s[1].casefold()), -1)
         if note_index == -1:
             sorted_tupes.insert(2, ('', 'NOTE'))
         else:
@@ -191,18 +180,49 @@ def check_conformance(line_count, vtt_head, fileExt):
             if note_index != 2:
                 item = sorted_tupes.pop(note_index)
                 sorted_tupes.insert(2, item)
-    print(f'sorted_tupes: {sorted_tupes}')
 
-    type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
-    print(f'type_index: {type_index}')
-    
     if fileExt == '.txt':
-        if any
-        sorted_tupes
-        vtt_head.insert(type_index, note_str + '\n')
+        sorted_tupes = [t for t in sorted_tupes if t[1] != webvtt_str]
+        sorted_tupes = [t for t in sorted_tupes if t[1] != note_str]
+        type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
+        if type_index == -1:
+            sorted_tupes.insert(0, ('Type', 'transcript'))
+        else:
+            type_update = ('Type', 'transcript')
+            sorted_tupes[type_index] = type_update
+    
+    sorted_tupes.append(('', '\n'))
+    
+    return sorted_tupes
 
-    return vtt_head, updated
+def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt, nodefault):
+    print(f'final_header: {final_header}')
 
+    newfile = os.path.join(outputDir, outputName)
+    
+    newheader = list(combined.values())
+    newheader = [x for x in newheader if x != '']
+    to_remove = "\n"
+    newheader = [item.replace(to_remove, "") for item in newheader]
+    to_add = "\n"
+    newheader[0] = newheader[0] + to_add
+    newheader[-1] = newheader[-1] + to_add
+
+    if fileExt == '.vtt':
+        type_str = 'Type: transcript'
+        type_index = next((i for i, s in enumerate(newheader) if type_str in s), -1)
+        if type_index != -1 and nodefault == True:
+            newheader[type_index] = newheader[type_index].replace('transcript', '')
+        elif type_index != -1 and nodefault == False:
+            newheader[type_index] = newheader[type_index].replace('transcript', 'caption')
+    with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+        for item in newheader:
+            f_out.write(f'{item}\n')
+        for _ in range(line_count):
+            next(f_in, None)
+        shutil.copyfileobj(f_in, f_out)
+    f_in.close()
+    f_out.close()
 
 #     Type (no)
 #     Language (yes)
@@ -213,7 +233,6 @@ def check_conformance(line_count, vtt_head, fileExt):
 #     File Creation Date (no)
 #     Title (no)
 #     Origin History (yes)
-
 
 
 
@@ -245,9 +264,12 @@ combined = build_combined_header(merged_header_data, merged_locals, csv_row_data
 # print(f'combined: {combined}')
 
 vtt_head = combined
-line_count = 15
-fileExt = '.vtt'
+fileExt = '.txt'
 
-vtt_head_new, updated = check_conformance(line_count, vtt_head, fileExt)
+final_header = check_conformance(vtt_head, fileExt)
+# print(f'final_header: {final_header}')
 
+
+
+write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt, nodefault)
     
