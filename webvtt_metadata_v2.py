@@ -164,36 +164,43 @@ def check_conformance(line_count, vtt_head, fileExt):
     print(f'sorted_tupes: {sorted_tupes}')
 
     webvtt_str = 'WEBVTT'
-    nl_str = '\n'
     note_str = 'NOTE'
     type_str = 'Type'
     
     webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() in s[1].casefold()), -1)
     print(f'webvtt_index: {webvtt_index}')
+    if fileExt == '.vtt':
+        if webvtt_index == -1:
+            sorted_tupes.insert(0, ('', 'WEBVTT'))
+        else:
+            caps_webvtt = ('', sorted_tupes[webvtt_index][1].upper())
+            sorted_tupes[webvtt_index] = caps_webvtt
+            if webvtt_index != 0:
+                item = sorted_tupes.pop(webvtt_index)
+                sorted_tupes.insert(0, item)
+        sorted_tupes.insert(1, ('', '\n'))
+    
     note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() in s[1].casefold()), -1)
     print(f'note_index: {note_index}')
+    if fileExt == '.vtt':
+        if note_index == -1:
+            sorted_tupes.insert(2, ('', 'NOTE'))
+        else:
+            caps_note = ('', sorted_tupes[note_index][1].upper())
+            sorted_tupes[note_index] = caps_note
+            if note_index != 2:
+                item = sorted_tupes.pop(note_index)
+                sorted_tupes.insert(2, item)
+    print(f'sorted_tupes: {sorted_tupes}')
+
     type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
     print(f'type_index: {type_index}')
     
-    if fileExt == '.vtt':
-        if webvtt_index == -1:
-            vtt_head.insert(0, ('Header', 'WEBVTT'))
-            updated = True
-        elif webvtt_index != 0:
-            item = vtt_head.pop(webvtt_index)
-            vtt_head.insert(0, item)
-            
-    if 1 not in nl_indices and fileExt == '.vtt':
-        vtt_head.insert(1, nl_str)
-        updated = True
-    if 2 not in note_index and fileExt == '.vtt':
-        vtt_head.insert(2, note_str + '\n')
-        updated = True
-    if fileExt == '.txt' and not note_index:
+    if fileExt == '.txt':
+        if any
+        sorted_tupes
         vtt_head.insert(type_index, note_str + '\n')
-    if (line_count - 1) not in nl_indices:
-        vtt_head.append(nl_str)
-        updated = True
+
     return vtt_head, updated
 
 
@@ -222,7 +229,7 @@ csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
 
 vtt_header_data, header_locals = get_header_data(vtt_head)
 parent_header_data, p_header_locals = get_header_data(parent_head)
-print(f'vtt_header_data: {vtt_header_data}')
+# print(f'vtt_header_data: {vtt_header_data}')
 # print(f'header_locals: {header_locals}')
 
 merged_header_data, merged_locals = merge_headers(vtt_header_data, parent_header_data)
