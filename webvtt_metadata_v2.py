@@ -371,6 +371,9 @@ def generate_log(log, what2log):
 def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, default):
     logname = 'webvtt_metadata_log.txt'
     log_source = os.path.join(outputDir, logname)
+    files_updated = []
+    files_skipped = []
+    files_nonconforming = []
     ext = ['.vtt', '.txt']
     for newvtt in glob.glob(f'{reviewed_dir}/*{ext}'):
         if os.path.isfile(newvtt):
@@ -401,6 +404,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
             line_count = get_header_line_count(newvtt, pattern, fileExt)
             if line_count == -1:
                 print('timestamps not found in file, skipping to next file')
+                files_skipped.append(outputName)
                 continue
             elif (line_count == 2 and fileExt == '.vtt') or line_count == -2:
                 print('no FADGI header detected')
@@ -417,6 +421,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                     elif match_row == -1 and default == False:
                         print('no match found and default metadata is not being applied, skipping to next file')
+                        files_skipped.append(outputName)
                         continue
                     else:
                         print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
@@ -437,15 +442,16 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                     else:
                         print('no csv, no header, and default metadata is not being applied, skipping to next file')
+                        files_skipped.append(outputName)
                         continue
             else:
                 vtt_head, lines = assess_parent_header(newvtt, reviewed_dir)
-                header_data = get_header_data(vtt_head)  
+                header_data = get_header_data(vtt_head)
+                csv_row_data = ''
                 if m_csv != None:
                     print('checking csv for match...')
                     match_row = find_match(m_csv, outputName)
                     if match_row == -1 and default == True:
-                        csv_row_data = ''
                         if reviewed == False:
                             print('no match found, applying default unreviewed metadata')
                         else:
@@ -456,11 +462,16 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             print('no match found and default metadata is not being applied, checking conformance only')
                             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
-                            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
+                            files_updated.append(outputName)
+                            if forbidden_arrow:
+                                log_entry = f'{outputName} header contains restricted arrow substring:\n{forbidden_arrow}'
+                                files_nonconforming.append(log_entry)
+                            if forbidden_dupes_in_ya_tupes:
+                                log_entry = f'{outputName} header has duplicate nonrepeatable elements:\n{forbidden_dupes_in_ya_tupes}'
+                                files_nonconforming.append(log_entry)
                             continue
                         else:
                             print('no match found and default metadata is not being applied, only updating review history')
-                            csv_row_data = ''
                             combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                     else:
                         print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
@@ -477,31 +488,45 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     if default == True:
                         if reviewed == False:
                             print('no csv, using default unreviewed metadata')
-                            csv_row_data = ''
-                            combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                         else:
                             print('no csv, using default reviewed metadata')
-                            csv_row_data = ''
-                            combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
+                        combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                     else:
                         if reviewed == False:
                             print('no csv and default metadata is not being applied, checking conformance only')
                             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
-                            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
+                            files_updated.append(outputName)
+                            if forbidden_arrow:
+                                log_entry = f'{outputName} header contains restricted arrow substring:\n{forbidden_arrow}'
+                                files_nonconforming.append(log_entry)
+                            if forbidden_dupes_in_ya_tupes:
+                                log_entry = f'{outputName} header has duplicate nonrepeatable elements:\n{forbidden_dupes_in_ya_tupes}'
+                                files_nonconforming.append(log_entry)
                             continue
                         else:
                             print('no csv and default metadata is not being applied, only updating review history')
-                            csv_row_data = ''
                             combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)             
             if fileExt == '.txt' and line_count != -2:
                 line_count = lines + 1
             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(combined, fileExt, default)
             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
-            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
+            files_updated.append(outputName)
+            if forbidden_arrow:
+                log_entry = f'{outputName} header contains restricted arrow substring:\n{forbidden_arrow}'
+                files_nonconforming.append(log_entry)
+            if forbidden_dupes_in_ya_tupes:
+                log_entry = f'{outputName} header has duplicate nonrepeatable elements:\n{forbidden_dupes_in_ya_tupes}'
+                files_nonconforming.append(log_entry)
             continue
         else:
             continue
+    print(files_skipped)
+    print(files_updated)
+    print(files_nonconforming)
+    generate_log(log_source, f'files skipped:\n\n{files_skipped}\n')
+    generate_log(log_source, f'files updated:\n\n{files_updated}\n')
+    generate_log(log_source, f'files with nonconforming data:\n\n{files_nonconforming}')
 
 def main(args_):
     args = setup(args_)
