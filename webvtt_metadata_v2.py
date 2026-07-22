@@ -15,8 +15,8 @@ from itertools import zip_longest, islice, chain
 sys.argv = [
    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
    '/Users/nraogra/Desktop/webvtt_v2',
-   '-c',
-   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
+#    '-c',
+#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
 #     '-r',
 #     '-e',
    '-p', 
@@ -310,7 +310,6 @@ def check_conformance(vtt_head, fileExt, default):
                 else:
                     type_update = ('Type', 'caption')
                     sorted_tupes[type_index] = type_update
-
     if fileExt == '.txt':
         sorted_tupes = [t for t in sorted_tupes if t[1] != webvtt_str]
         sorted_tupes = [t for t in sorted_tupes if t[1] != note_str]
@@ -326,22 +325,24 @@ def check_conformance(vtt_head, fileExt, default):
                 sorted_tupes.insert(0, ('Type', ''))
 
     sorted_tupes.append(('', ''))
-    print(f'sorted_tupes: {sorted_tupes}')
     
     arrow = '-->'
-    
-    
-    return sorted_tupes
+    forbidden_arrow = [t for t in sorted_tupes if any(arrow in str(x) for x in t)]
+    if forbidden_arrow:
+        print(f'forbidden_arrow: {forbidden_arrow}')
+    forbidden_dupes = ['Type', 'Originating File', 'File Creation Date', 'Title']
+    seen = set()
+    dupes = set()
+    for x in sorted_tupes:
+        if x[0] in seen:
+            dupes.add(x[0])
+        else:
+            seen.add(x[0])
+    forbidden_dupes_in_ya_tupes = [x for x in dupes if x in forbidden_dupes]
+    if forbidden_dupes_in_ya_tupes:
+        print(f'forbidden_dupes_in_ya_tupes: {forbidden_dupes_in_ya_tupes}')
 
-#     Type (no)
-#     Language (yes)
-#     Responsible Party (yes)
-#     Media Identifier (yes)
-#     Originating File (no)
-#     File Creator (yes)
-#     File Creation Date (no)
-#     Title (no)
-#     Origin History (yes)
+    return sorted_tupes, forbidden_arrow, forbidden_dupes_in_ya_tupes
 
 def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt):
     newfile = os.path.join(outputDir, outputName)
@@ -359,7 +360,17 @@ def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fi
     f_in.close()
     f_out.close()
 
+def generate_log(log, what2log):
+    if not os.path.isfile(log):
+        with open(log, "w", encoding='utf-8') as f:
+            f.write(what2log + '\n')
+    else:
+        with open(log, "a", encoding='utf-8') as f:
+            f.write(what2log + '\n')
+
 def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, default):
+    logname = 'webvtt_metadata_log.txt'
+    log_source = os.path.join(outputDir, logname)
     ext = ['.vtt', '.txt']
     for newvtt in glob.glob(f'{reviewed_dir}/*{ext}'):
         if os.path.isfile(newvtt):
@@ -443,8 +454,9 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     elif match_row == -1 and default == False:
                         if reviewed == False:
                             print('no match found and default metadata is not being applied, checking conformance only')
-                            final_header = check_conformance(header_data, fileExt, default)
+                            final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
                             continue
                         else:
                             print('no match found and default metadata is not being applied, only updating review history')
@@ -474,8 +486,9 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     else:
                         if reviewed == False:
                             print('no csv and default metadata is not being applied, checking conformance only')
-                            final_header = check_conformance(header_data, fileExt, default)
+                            final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
                             continue
                         else:
                             print('no csv and default metadata is not being applied, only updating review history')
@@ -483,8 +496,9 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)             
             if fileExt == '.txt' and line_count != -2:
                 line_count = lines + 1
-            final_header = check_conformance(combined, fileExt, default)
+            final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(combined, fileExt, default)
             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+            generate_log(log_source, f'{outputName}: lines with arrows: {forbidden_arrow}, forbidden duplicate elements: {forbidden_dupes_in_ya_tupes}')
             continue
         else:
             continue
@@ -515,9 +529,9 @@ def main(args_):
         print('default metadata: true\n\tscript will use Emory default metadata set for empty fields')
     else:
         print('default metadata: false\n\tscript will not use Emory default metadata set for empty fields')
-    outputDir = make_output_dir(reviewed_dir)
     proceed = ask_yes_no('proceed with these settings?')
     if proceed =='Y':
+        outputDir = make_output_dir(reviewed_dir)
         update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, default)
     else:
         print('exiting. goodbye!')
