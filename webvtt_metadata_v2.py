@@ -19,8 +19,8 @@ sys.argv = [
    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
 #     '-r',
 #     '-e',
-#    '-p', 
-#    '/Users/nraogra/Desktop/webvtt_v2',
+   '-p', 
+   '/Users/nraogra/Desktop/webvtt_v2',
    ]
 
 def valid_directory(path_string):
@@ -111,8 +111,6 @@ def get_csv_metadata(match_row, m_csv):
         values = data[match_row]
         zipped = list(zip_longest(keys, values, fillvalue=''))
         for key, value in zipped:
-            if "Source File".casefold() in key.casefold():
-                zipped.remove((key, value))
             if key.casefold() == "_Parent File".casefold():
                 parentfile = value
             else:
@@ -135,10 +133,8 @@ def assess_parent_header(parentfile, parent_dir):
         justName = Path(vttfile).stem
         fileExt = Path(vttfile).suffix
         if fileExt == '.vtt':
-#             outputName = justName + ".vtt"
             pattern = r'(\d{2}:\d{2}.\d{3} --> )'
         elif fileExt == '.txt':
-#             outputName = justName + ".txt"
             pattern = r'^Type:'
         else:
             print(f'file {justName}{fileExt} is not .vtt or .txt')
@@ -190,7 +186,6 @@ def get_header_data(parent_head):
         flatlist = [x.replace('software version', 'Software Version', 1) if 'software version' in x else x for x in flatlist]
         flatlist = [x.replace('Review history', 'Review History', 1) if 'Review history' in x else x for x in flatlist]
         header_locals = [x.replace('review history', 'Review History', 1) if 'review history' in x else x for x in flatlist]
-        local_tuples = [tuple(x.split(': ')) for x in header_locals]
         for index in sorted(chain(indices, lox), reverse=True):
             del parent_head[index]
         parent_head.extend(header_locals)
@@ -198,20 +193,20 @@ def get_header_data(parent_head):
         if ':' not in item:
             parent_head[index] = item + ': ' + item
     parent_head_tuples = [tuple(x.split(': ', 1)) for x in parent_head]
-    header_data = parent_head_tuples
-    print(f'header_data: {header_data}')
-    print(f'header_locals: {header_locals}')
+    header_data = parent_head_tuples    
     return header_data
     
-def merge_headers(vtt_header_data, parent_header_data):
+def merge_headers(vtt_header_data, parent_header_data, source):
     if not any('File Creation Date'.casefold() in t[0].casefold() for t in vtt_header_data):
         if any('File Creation Date'.casefold() in t[0].casefold() for t in parent_header_data):
             parent_header_data = [t for t in parent_header_data if t[0].casefold() != 'File Creation Date'.casefold()]
+    parent_header_data = [
+        t + (source,) if t[0].casefold() == '_Reviewer'.casefold() and len(t) <= 2 else t for t in parent_header_data]
     vtt_locals = list({t for t in vtt_header_data if t and t[0].startswith('_')})
     p_locals = {t for t in parent_header_data if t and t[0].startswith('_')}
     vtt_nonlocal = list({t for t in vtt_header_data if t and not t[0].startswith('_')})
     vtt_keys = {x[0].casefold() for x in vtt_header_data}
-    loc_append = {'_Reviewer'.casefold(), '_Editing method'.casefold()}
+    loc_append = {'_Reviewer'.casefold()}
     p_unique = [x for x in parent_header_data if x[0].casefold() not in vtt_keys]
     p_uniq_nonlocal = list({t for t in p_unique if t and not t[0].startswith('_')})
     p_uniq_local = list({t for t in p_unique if t and t[0].startswith('_')})
@@ -222,13 +217,17 @@ def merge_headers(vtt_header_data, parent_header_data):
     return merged_header_data
 
 def build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, default):
+    for key, value in csv_row_data:
+        if "Source File".casefold() in key.casefold():
+            source = value
+            csv_row_data.remove((key, value))
     if csv_row_data != '':
         csv_row_data = [t for t in csv_row_data if t[1] != '']
         if not any('File Creation Date'.casefold() in t[0].casefold() for t in csv_row_data):
             if any('File Creation Date'.casefold() in t[0].casefold() for t in parent_header_data):
                 header_date = next((v for k, v in parent_header_data if k.casefold() == 'File Creation Date'.casefold()), '')
                 csv_row_data.append(('File Creation Date', header_date))
-        combined_header_data = merge_headers(csv_row_data, parent_header_data)
+        combined_header_data = merge_headers(csv_row_data, parent_header_data, source)
     else:
         combined_header_data = parent_header_data
 
@@ -261,8 +260,6 @@ def build_combined_header(parent_header_data, csv_row_data, creation_date, revie
             combined_header_data.append(('_Review History', 'human-reviewed'))
         if not any('_Reviewer'.casefold() in t[0].casefold() for t in combined_header_data):
             combined_header_data.append(('_Reviewer', 'unknown'))
-        if not any('_Editing Method'.casefold() in t[0].casefold() for t in combined_header_data):
-            combined_header_data.append(('_Editing Method', 'unknown'))
         if not any('_Parent File'.casefold() in t[0].casefold() for t in combined_header_data):
             combined_header_data.append(('_Parent File', 'unknown'))
     if default == False and reviewed == True:
@@ -329,7 +326,13 @@ def check_conformance(vtt_head, fileExt, default):
                 sorted_tupes.insert(0, ('Type', ''))
 
     sorted_tupes.append(('', ''))
+    print(f'sorted_tupes: {sorted_tupes}')
     
+    arrow = '-->'
+    
+    
+    return sorted_tupes
+
 #     Type (no)
 #     Language (yes)
 #     Responsible Party (yes)
@@ -340,12 +343,12 @@ def check_conformance(vtt_head, fileExt, default):
 #     Title (no)
 #     Origin History (yes)
 
-    return sorted_tupes
-
 def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt):
     newfile = os.path.join(outputDir, outputName)
     final_header = [t[1:] if (t and not t[0]) else t for t in final_header]
+    final_header = [(t[0], (', '.join([str(t[1]), str(t[2])]))) if len(t) == 3 else t for t in final_header]
     final_header = [': '.join(map(str, t)) for t in final_header]
+
     newfile = os.path.join(outputDir, outputName)
     with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
         for item in final_header:
@@ -411,8 +414,6 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             print(f'contains parent info: {parentfile}, getting parent file header...')
                             parent_head, lines = assess_parent_header(parentfile, parent_dir)
                             if parent_head != None:
-#                                 print('no parent file FADGI header')
-#                             else:
                                 print('combining parent file header and metadata from csv...')
                                 header_data = get_header_data(parent_head)
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
@@ -456,11 +457,9 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             print(f'contains parent info: {parentfile}, getting parent file header...')
                             parent_head, lines = assess_parent_header(parentfile, parent_dir)
                             if parent_head != None:
-#                                 print('no parent file FADGI header')
-#                             else:
                                 print('combining source header, parent file header, and metadata from csv...')
                                 parent_header_data = get_header_data(parent_head)
-                                header_data = merge_headers(header_data, parent_header_data)
+                                header_data = merge_headers(header_data, parent_header_data, parentfile)
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default)
                 else:
                     if default == True:
