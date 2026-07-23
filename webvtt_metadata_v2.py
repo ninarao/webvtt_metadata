@@ -465,9 +465,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + 'header contains restricted arrow substring:\n\t' + forbidden_arrow)
+                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
+                                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_ya_tupes:
-                                files_nonconforming.append(outputName + 'header has duplicate nonrepeatable elements:\n\t' + forbidden_dupes_in_ya_tupes)
+                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
+                                                           '\n\t'.join(map(str, forbidden_dupes_in_ya_tupes)))
                             continue
                         else:
                             print('no match found and default metadata is not being applied, only updating review history')
@@ -497,9 +499,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + 'header contains restricted arrow substring:\n\t' + forbidden_arrow)
+                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
+                                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_ya_tupes:
-                                files_nonconforming.append(outputName + 'header has duplicate nonrepeatable elements:\n\t' + forbidden_dupes_in_ya_tupes)
+                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
+                                                           '\n\t'.join(map(str, forbidden_dupes_in_ya_tupes)))
                             continue
                         else:
                             print('no csv and default metadata is not being applied, only updating review history')
@@ -510,25 +514,34 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
             files_updated.append(outputName)
             if forbidden_arrow:
-                files_nonconforming.append(outputName + 'header contains restricted arrow substring:\n\t' + forbidden_arrow)
+                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
+                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
             if forbidden_dupes_in_ya_tupes:
-                files_nonconforming.append(outputName + 'header has duplicate nonrepeatable elements:\n\t' + forbidden_dupes_in_ya_tupes)
+                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
+                                           '\n\t'.join(map(str, forbidden_dupes_in_ya_tupes)))
             continue
         else:
             continue
-    generate_log(log_source, timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
+    generate_log(log_source, '\nWebVTT metadata log for ' + outputDir + '\n')
     if files_skipped:
         generate_log(log_source, 'Files skipped:')
         for item in files_skipped:
-            generate_log(log_source, '\t' + item)
+            generate_log(log_source, item)
+    if files_skipped and files_updated:
+        generate_log(log_source, '')
     if files_updated:
         generate_log(log_source, 'Files updated:')
         for item in files_updated:
-            generate_log(log_source, '\t' + item)
+            generate_log(log_source, item)
+    if files_updated and files_nonconforming:
+        generate_log(log_source, '')
+    elif files_skipped and files_nonconforming and not files_updated:
+        generate_log(log_source, '')
     if files_nonconforming:
-        generate_log(log_source, 'Files with nonconforming data:')
+        generate_log(log_source, 'Files with nonconforming metadata:')
         for item in files_nonconforming:
-            generate_log(log_source, '\t' + item)
+            generate_log(log_source, item)
+    generate_log(log_source, '\nFinished running at ' + timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
 
 def main(args_):
     args = setup(args_)
