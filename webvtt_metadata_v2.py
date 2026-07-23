@@ -276,7 +276,6 @@ def check_conformance(vtt_head, fileExt, default):
             'File Creation Date', 'Title', 'Origin History']
     order_map = {key.lower(): index for index, key in enumerate(ref_list)}
     sorted_tupes = sorted(vtt_head, key=lambda x: (order_map.get(x[0].lower(), float('inf')), x[0].lower(), id(x)))
-    
     webvtt_str = 'WEBVTT'
     note_str = 'NOTE'
     type_str = 'Type'
@@ -323,7 +322,6 @@ def check_conformance(vtt_head, fileExt, default):
         else:
             if type_index == -1:
                 sorted_tupes.insert(0, ('Type', ''))
-
     sorted_tupes.append(('', ''))
     
     arrow = '-->'
@@ -344,12 +342,10 @@ def check_conformance(vtt_head, fileExt, default):
 
     return sorted_tupes, forbidden_arrow, forbidden_dupes_in_ya_tupes
 
-def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt):
-    newfile = os.path.join(outputDir, outputName)
+def write_new_header(final_header, outputDir, outputName, newvtt, line_count):
     final_header = [t[1:] if (t and not t[0]) else t for t in final_header]
     final_header = [(t[0], (', '.join([str(t[1]), str(t[2])]))) if len(t) == 3 else t for t in final_header]
     final_header = [': '.join(map(str, t)) for t in final_header]
-
     newfile = os.path.join(outputDir, outputName)
     with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
         for item in final_header:
@@ -462,7 +458,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                         if reviewed == False:
                             print('no match found and default metadata is not being applied, checking conformance only')
                             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
@@ -496,7 +492,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                         if reviewed == False:
                             print('no csv and default metadata is not being applied, checking conformance only')
                             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(header_data, fileExt, default)
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
@@ -511,7 +507,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
             if fileExt == '.txt' and line_count != -2:
                 line_count = lines + 1
             final_header, forbidden_arrow, forbidden_dupes_in_ya_tupes = check_conformance(combined, fileExt, default)
-            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
             files_updated.append(outputName)
             if forbidden_arrow:
                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
