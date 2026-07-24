@@ -3,7 +3,7 @@ Python program that writes metadata to WebVTT files according to the [FADGI Guid
 
 ## Updates
 - The script has been updated to align with the updated FADGI guidelines, including:
-  - repeatable elements are listed as separate element: value pairs, each pair on its own line
+  - repeatable elements are listed as separate "element: value" pairs, each pair on its own line
   - local element formatting has been updated
   - the FADGI header block begins with "NOTE"
   - any blank lines within the header block are removed
