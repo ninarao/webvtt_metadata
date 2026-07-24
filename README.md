@@ -1,7 +1,7 @@
 # webvtt_metadata
 Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 2.0)](https://www.digitizationguidelines.gov/guidelines/FADGI_WebVTT_embed_guidelines_v0.1_2024-04-18.pdf), using a csv template file, header data from the current file, header data from an associated parent file, and/or a default metadata set. The script does not overwrite the input files; output is written to a new folder that is created inside the input folder.
 
-## Updates
+### Updates
 - The script has been updated to align with the updated FADGI guidelines, including:
   - repeatable elements are listed as separate "element: value" pairs, each pair on its own line
   - local element formatting has been updated
@@ -15,7 +15,7 @@ Python program that writes metadata to WebVTT files according to the [FADGI Guid
   - if the existing header has a "Type" value of "caption", the script changes this value to "transcript" if ``--emorydefault`` is selected or to "" if not
   - because "transcript" is not an allowed value for the WebVTT "Type" element, if header data with a "Type" value of "transcript" is applied to a .vtt file, the script will change this value to "caption" if ``--emorydefault`` is selected or to "" if not
 
-## Usage
+### Usage
 The only required input is the path to the folder of input files:
 
 ```webvtt_metadata.py [path/to/inputfolder]```
@@ -28,7 +28,7 @@ Command options:
 
 For non-local elements, the script uses metadata from the csv first, then from the source file header, then from the parent file header, with one exception: File Creation Date will be carried over from the csv metadata or the source file header, but not from the parent file header. Local elements merge in the same way except metadata for [Reviewer] is retained from each source and any file source is indicated.
 
-## CSV template
+### CSV template
 The template includes all strongly recommended, recommended, and optional elements:
 - Type (strongly recommended)
 - Language (strongly recommended)
@@ -45,7 +45,7 @@ Any elements left blank will not be included in the output header (or will be fi
 
 To include a local usage element, prefix the element name with an underscore (_) in the header row.
 
-## Variations
+### Variations
 
 The csv template is designed so that metadata can be entered separately for each webvtt file. For a version that uses a single set of metadata for all webvtt files in the input folder, use the "_bulk" versions:
 
