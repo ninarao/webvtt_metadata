@@ -2,7 +2,7 @@
 Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 2.0)](https://www.digitizationguidelines.gov/guidelines/FADGI_WebVTT_embed_guidelines_v0.1_2024-04-18.pdf), using a csv template file, header data from the current file, header data from an associated parent file, and/or a default metadata set. The script does not overwrite the input files; output is written to a new folder that is created inside the input folder.
 
 ## Updates
-- The script has been updated according to the updated FADGI guidelines, including:
+- The script has been updated to align with the updated FADGI guidelines, including:
   - repeatable elements are listed as separate element: value pairs, each pair on its own line
   - local element formatting has been updated
   - the FADGI header block begins with "NOTE"
