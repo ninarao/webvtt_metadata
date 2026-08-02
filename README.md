@@ -44,7 +44,7 @@ The template includes all strongly recommended, recommended, and optional elemen
 
 Any elements left blank will not be included in the output header (or will be filled with default metadata if ``-e`` is used).
 
-To include a local usage element, prefix the element name with an underscore (_) in the header row.
+To include a local usage element, prefix the element name with an underscore ``_`` in the header row.
 
 ### Variations
 
