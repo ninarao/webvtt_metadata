@@ -25,8 +25,9 @@ Command options:
 - ``-e`` or ``--emorydefault``: Use Emory default metadata set for empty metadata elements
 - ``-r`` or ``--reviewed``: Updates "review history" value to "human-reviewed" for files with an existing FADGI header (it will also create this element if it doesn't exist)
 - ``-p`` or ``--parentfiles`` ``[path/to/parentfolder]``: Check directory of parent files for associated header data (requires CSV to match source file with parent file)
+- ``-o`` or ``--overwrite``: if new values are given for repeatable elements, overwrite the existing values
 
-For non-local elements, the script uses metadata from the csv first, then from the source file header, then from the parent file header, with one exception: File Creation Date will be carried over from the csv metadata or the source file header, but not from the parent file header. Local elements merge in the same way except metadata for [Reviewer] is retained from each source and any file source is indicated.
+For nonrepeatable elements, the script uses metadata from the csv first, then from the source file header, then from the parent file header (with one exception: File Creation Date will be carried over from the csv metadata or the source file header, but not from the parent file header). For repeatable elements, if values exist in multiple sources, the script by default will preserve existing values and append any new ones. To overwrite values instead of appending, use option ``-o``. Local elements are handled as nonrepeatable except that values for ``_Reviewer`` are retained from each source and any file source is indicated.
 
 ### CSV template
 The template includes all strongly recommended, recommended, and optional elements:
