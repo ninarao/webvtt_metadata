@@ -11,18 +11,19 @@ import re
 import argparse
 import shutil
 from itertools import zip_longest, islice, chain
+import textwrap
 
-# sys.argv = [
-#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
-#    '/Users/nraogra/Desktop/webvtt_v2',
-#    '-c',
-#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
+sys.argv = [
+   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
+   '/Users/nraogra/Desktop/webvtt_v2',
+   '-c',
+   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
 #     '-r',
 #     '-e',
 #    '-o',
 #    '-p', 
 #    '/Users/nraogra/Desktop/webvtt_v2',
-#    ]
+   ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -266,6 +267,8 @@ def build_combined_header(parent_header_data, csv_row_data, creation_date, revie
     if default == True and reviewed == True:
         if not any('_Review History'.casefold() in t[0].casefold() for t in combined_header_data):
             combined_header_data.append(('_Review History', 'human-reviewed'))
+        else:
+            combined_header_data = [(t[0], 'human-reviewed') if t[0].casefold() == '_Review History'.casefold() else t for t in combined_header_data]
         if not any('_Reviewer'.casefold() in t[0].casefold() for t in combined_header_data):
             combined_header_data.append(('_Reviewer', 'unknown'))
         if not any('_Parent File'.casefold() in t[0].casefold() for t in combined_header_data):
@@ -330,11 +333,11 @@ def check_conformance(vtt_head, fileExt, default):
             if type_index == -1:
                 sorted_tupes.insert(0, ('Type', ''))
     sorted_tupes.append(('', ''))
-    
     arrow = '-->'
     forbidden_arrow = [t for t in sorted_tupes if any(arrow in str(x) for x in t)]
     if forbidden_arrow:
         forbidden_arrow = [': '.join(map(str, t)) for t in forbidden_arrow]
+        forbidden_arrow = [textwrap.indent(textwrap.fill(t, width=75), '    ') for t in forbidden_arrow]
         print(f'forbidden_arrow: {forbidden_arrow}')
     nonrepeatable = ['Type', 'Originating File', 'File Creation Date', 'Title']
     seen = set()
@@ -351,8 +354,8 @@ def check_conformance(vtt_head, fileExt, default):
             forbidden_dupes_in_tupes.add(x)
     if forbidden_dupes_in_tupes:
         forbidden_dupes_in_tupes = [': '.join(map(str, t)) for t in forbidden_dupes_in_tupes]
+        forbidden_dupes_in_tupes = [textwrap.indent(textwrap.fill(t, width=75), '    ') for t in forbidden_dupes_in_tupes]
         print(f'forbidden_dupes_in_tupes: {forbidden_dupes_in_tupes}')
-
     return sorted_tupes, forbidden_arrow, forbidden_dupes_in_tupes
 
 def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt):
@@ -476,11 +479,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
-                                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
+                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                                                           '\n'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_tupes:
-                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
-                                                           '\n\t'.join(map(str, forbidden_dupes_in_tupes)))
+                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                                                           '\n'.join(map(str, forbidden_dupes_in_tupes)))
                             continue
                         else:
                             print('no match found and default metadata is not being applied, only updating review history')
@@ -512,11 +515,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
-                                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
+                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                                                           '\n'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_tupes:
-                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
-                                                           '\n\t'.join(map(str, forbidden_dupes_in_tupes)))
+                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                                                           '\n'.join(map(str, forbidden_dupes_in_tupes)))
                             continue
                         else:
                             print('no csv and default metadata is not being applied, only updating review history')
@@ -527,11 +530,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
             files_updated.append(outputName)
             if forbidden_arrow:
-                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n\t' +
-                                           '\n\t'.join([str(x) for x in forbidden_arrow]))
+                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                                           '\n'.join([str(x) for x in forbidden_arrow]))
             if forbidden_dupes_in_tupes:
-                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n\t' +
-                                           '\n\t'.join(map(str, forbidden_dupes_in_tupes)))
+                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                                           '\n'.join(map(str, forbidden_dupes_in_tupes)))
             continue
         else:
             continue
@@ -543,7 +546,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
     if files_skipped and files_updated:
         generate_log(log_source, '')
     if files_updated:
-        generate_log(log_source, 'Files updated:')
+        generate_log(log_source, 'Files checked:')
         for item in files_updated:
             generate_log(log_source, item)
     if files_updated and files_nonconforming:
@@ -578,7 +581,8 @@ def main(args_):
     if reviewed == True:
         print('webvtt files are: reviewed\n\tscript will update "review history" to "human-reviewed"\n\t(it will also create this element if it doesn\'t exist)')
     else:
-        print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand check conformance of files with existing FADGI headers')
+        print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand check or update existing FADGI headers'
+              '\n\texisting "review history" elements will not be changed')
     if default == True:
         print('default metadata: true\n\tscript will use Emory default metadata set for empty fields')
     else:
@@ -586,7 +590,7 @@ def main(args_):
     if overwrite == True:
         print('overwrite mode:\n\tscript will overwrite existing repeatable element values if new values are given')
     else:
-        print('append mode: script will append repeatable element values and preserve any existing values')
+        print('append mode:\n\tscript will append repeatable element values and preserve any existing values')
     proceed = ask_yes_no('proceed with these settings?')
     if proceed =='Y':
         outputDir = make_output_dir(reviewed_dir)
