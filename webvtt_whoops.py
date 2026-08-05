@@ -13,7 +13,7 @@ sys.argv = [
    'webvtt_whoops.py',
    '/Users/nraogra/Desktop/webvtt_v2'
    ]
-# /Users/nraogra/Desktop/webvtt_v2/webvtt_metadata.csv
+# /Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv
 
 def setup(args_):
     parser = argparse.ArgumentParser(
@@ -56,10 +56,13 @@ def make_output_dir(source):
         print(f'\toutput folder already exists: \n\t{outputDir}')
     return outputDir
 
-def append_or_overwrite(source, element_choice):
+def append_or_overwrite(source, element_choice, localYN):
     while True:
         print(f'\nWebVTT directory: {source}')
-        print(f'\n{element_choice} is a repeatable element. Would you like to append to or overwrite existing values?')
+        if localYN == 'N':
+            print(f'\n{element_choice} is a repeatable element. Would you like to append to or overwrite existing values?\n')
+        else:
+            print(f'\nFor local usage element "{element_choice}" would you like to append to or overwrite existing values?\n')
         print('1. Append')
         print('2. Overwrite')
         print('Q. Quit to main menu')
@@ -72,7 +75,7 @@ def append_or_overwrite(source, element_choice):
             mode = 'overwrite'
             return mode
         elif answer in ('Q', 'q'):
-            print(' - Returning to MAIN menu')
+            print(' - Returning to main menu')
             mode = 'quit'
             return mode
         else:
@@ -91,13 +94,9 @@ def revise_element(source, element_choice, outputDir, localYN):
         if choice == '1':
             menu = 'getcsv'
             return menu
-            get_csv_info(source, element_choice, outputDir, localYN)
         elif choice == '2':
-            m_csv = ""
-            col_index = ""
             menu = 'update'
             return menu
-            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN)
         elif choice in ['Q', 'q']:
             print(' - Returning to main menu')
             menu = 'stay'
@@ -105,44 +104,50 @@ def revise_element(source, element_choice, outputDir, localYN):
         else:
             print(' - Incorrect input. Please enter 1, 2, or Q')
 
-def get_csv_info(source, element_choice, outputDir, localYN):
+def get_csv_info(source, element_choice):
     print('Revising from CSV')
     m_csv = input('\n\n**** Enter CSV with full path):     ')
+    col_index = ''
     if not os.path.isfile(m_csv):
         print(f"'{m_csv}' is not a file.")
-        return
+        m_csv = ''
+        return m_csv, col_index
     if not m_csv.endswith(".csv"):
         print(f"'{m_csv}' is not a csv file.")
-        return
+        m_csv = ''
+        return m_csv, col_index
     source = os.path.abspath(source)
     print(m_csv)
     with open(m_csv, 'r', encoding='UTF-8') as mFile:
         mReader = csv.reader(mFile)
         try:
             header_row = next(mReader)
-            if element_choice in header_row:
-                col_index = header_row.index(element_choice)
+            header_row_lower = [x.casefold() for x in header_row]
+            if element_choice.casefold() in header_row_lower:
+                col_index = header_row_lower.index(element_choice.casefold())
                 print(f'Element "{element_choice}" in header row {col_index}.')
-                update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN)
             else:
                 print(f'Element "{element_choice}" not found in header row.\n')
-                return
+                m_csv = ''
+            return m_csv, col_index
         except StopIteration:
             print('CSV is empty or has no headers.\n')
-            return
+            m_csv = ''
+            return m_csv, col_index
 
 def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header):
     if localYN == 'Y':
-        element_choice = 'Local Usage Element: ' + element_choice
+        element_choice = '_' + element_choice
     if m_csv == "" and element_choice != 'NOTE':
         while True:
-            bulk_val = input(f'\n\n**** Input new element value to apply for field "{element_choice}":     ')
-            proceed_yn = ask_yes_no(f'New value: "{bulk_val}". Update header line to "{element_choice}: {bulk_val}" for all WebVTT files in directory?')
+            bulk_val = input(f'\n\n**** Input new value for element "{element_choice}":     ')
+            proceed_yn = ask_yes_no(f'New value: "{bulk_val}". Update header element to "{element_choice}: {bulk_val}" for all WebVTT files in directory?')
             if proceed_yn == 'Y':
                 break
             else:
-                print('\nReturning to menu.')
-                return
+                print('\nReturning to main menu.')
+                status = 'mainmenu'
+                return status
     ext = ['.vtt', '.txt']
     for vttfile in glob.glob(f'{source}/*{ext}'):
         if os.path.isfile(vttfile):
@@ -188,6 +193,9 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                     new_val = find_file(outputName, m_csv, col_index)
                 else:
                     new_val = bulk_val
+                if m_csv != "" and new_val == '':
+                    print(f'{outputName}: file not found in csv, skipping file.')
+                    continue
                 if elementline.endswith('\n'):
                     new_val = element_choice + ': ' + new_val + '\n'
                 print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
@@ -274,7 +282,7 @@ def run_main(source, outputDir):
         if choice in repeatable_list:
             element_choice = element_dict[choice]
             localYN = 'N'
-            mode = append_or_overwrite(source, element_choice)
+            mode = append_or_overwrite(source, element_choice, localYN)
             print(f'mode: {mode}')
             if mode in ('append', 'overwrite'):
                 return mode, element_choice, localYN
@@ -288,13 +296,13 @@ def run_main(source, outputDir):
             localYN = 'Y'
             while True:
                 element_choice = input('\n\n**** Input name of local usage element:     ')
-                proceed_yn = ask_yes_no(f'New value: "Local Usage Element: {element_choice}". Is this correct?')
+                proceed_yn = ask_yes_no(f'Local usage element: "{element_choice}". Is this correct?')
                 if proceed_yn == 'Y':
-                    mode = append_or_overwrite(source, element_choice)
+                    mode = append_or_overwrite(source, element_choice, localYN)
                     print(f'mode: {mode}')
                     return mode, element_choice, localYN
                 else:
-                    print('\nReturning to menu.')
+                    print('\nReturning to main menu.')
                     break
         elif choice.upper() == 'N':
             localYN = 'N'
@@ -329,6 +337,18 @@ def main(args_):
         if localYN == 'N':
             menu = revise_element(source, element_choice, outputDir, localYN)
             print(f'menu: {menu}')
+            if menu == 'getcsv':
+                m_csv, col_index = get_csv_info(source, element_choice)
+                if col_index == '':
+                    continue
+                if col_index != '':
+                    status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+            elif menu == 'update':
+                m_csv = ''
+                col_index = ''
+                status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+                if status == 'mainmenu':
+                    continue
             if menu != 'stay':
                 break
         elif localYN == 'Y':
