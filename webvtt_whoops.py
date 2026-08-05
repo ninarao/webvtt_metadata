@@ -9,11 +9,11 @@ import re
 import argparse
 import shutil
 
-#sys.argv = [
-#    'webvtt_metadata.py',
-#    '/Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_files/metadata_updated'
-#    ]
-# /Users/nraogra/Desktop/iPres2025/WebVTT_metadata/webvtt_metadata.csv
+sys.argv = [
+   'webvtt_whoops.py',
+   '/Users/nraogra/Desktop/webvtt_v2'
+   ]
+# /Users/nraogra/Desktop/webvtt_v2/webvtt_metadata.csv
 
 def setup(args_):
     parser = argparse.ArgumentParser(
@@ -56,28 +56,52 @@ def make_output_dir(source):
         print(f'\toutput folder already exists: \n\t{outputDir}')
     return outputDir
 
-def revise_menu(source, element_choice):
-    print(f'\nWebVTT directory: {source}')
-    print(f'Element selected: {element_choice}')
-    print('\nWhat would you like to do?')
-    print('1. Revise element from CSV (will match on WebVTT filenames)')
-    print('2. Input new element value (will apply same value to all WebVTT files)')
-    print('Q. Quit to main menu')
-    print('\n')
+def append_or_overwrite(source, element_choice):
+    while True:
+        print(f'\nWebVTT directory: {source}')
+        print(f'\n{element_choice} is a repeatable element. Would you like to append to or overwrite existing values?')
+        print('1. Append')
+        print('2. Overwrite')
+        print('Q. Quit to main menu')
+        print('\n')
+        answer = input()
+        if answer == '1':
+            mode = 'append'
+            return mode
+        elif answer == '2':
+            mode = 'overwrite'
+            return mode
+        elif answer in ('Q', 'q'):
+            print(' - Returning to MAIN menu')
+            mode = 'quit'
+            return mode
+        else:
+            print(' - Incorrect input. Please enter enter 1, 2, or Q')
     
 def revise_element(source, element_choice, outputDir, localYN):
     while True:
-        revise_menu(source, element_choice)
+        print(f'\nWebVTT directory: {source}')
+        print(f'Element selected: {element_choice}')
+        print('\nWhat would you like to do?')
+        print('1. Revise element from CSV (will match on WebVTT filenames)')
+        print('2. Input new element value (will apply same value to all WebVTT files)')
+        print('Q. Quit to main menu')
+        print('\n')
         choice = input('Enter your option: ').strip().upper()
         if choice == '1':
+            menu = 'getcsv'
+            return menu
             get_csv_info(source, element_choice, outputDir, localYN)
         elif choice == '2':
             m_csv = ""
             col_index = ""
+            menu = 'update'
+            return menu
             update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN)
         elif choice in ['Q', 'q']:
             print(' - Returning to main menu')
-            break
+            menu = 'stay'
+            return menu
         else:
             print(' - Incorrect input. Please enter 1, 2, or Q')
 
@@ -235,6 +259,57 @@ def main_menu(source):
     print('10. Local Usage Element (any)')
     print('N. Add NOTE if missing from header')
     print('Q. Quit')
+    
+def run_main(source, outputDir):
+    while True:
+        main_menu(source)
+        choice = input('\nEnter your option: ').strip().upper()
+        elements = ['Type', 'Language', 'Responsible Party',
+                    'Media Identifier', 'Originating File',
+                    'File Creator', 'File Creation Date', 'Title',
+                    'Origin History', 'Local Usage Element']
+        element_dict = {str(index+1): element for index, element in enumerate(elements)}
+        menu_list = [str(x) for x in range(1,10)]
+        repeatable_list = [str(x) for x in [2, 3, 4, 6, 9]]
+        if choice in repeatable_list:
+            element_choice = element_dict[choice]
+            localYN = 'N'
+            mode = append_or_overwrite(source, element_choice)
+            print(f'mode: {mode}')
+            if mode in ('append', 'overwrite'):
+                return mode, element_choice, localYN
+        elif choice in menu_list:
+            element_choice = element_dict[choice]
+            localYN = 'N'
+            mode = ''
+            print(f'mode: {mode}')
+            return mode, element_choice, localYN
+        elif choice == '10':
+            localYN = 'Y'
+            while True:
+                element_choice = input('\n\n**** Input name of local usage element:     ')
+                proceed_yn = ask_yes_no(f'New value: "Local Usage Element: {element_choice}". Is this correct?')
+                if proceed_yn == 'Y':
+                    mode = append_or_overwrite(source, element_choice)
+                    print(f'mode: {mode}')
+                    return mode, element_choice, localYN
+                else:
+                    print('\nReturning to menu.')
+                    break
+        elif choice.upper() == 'N':
+            localYN = 'N'
+            m_csv = ""
+            element_choice = 'NOTE'
+            col_index = ""
+            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+        elif choice.upper() == 'Q':
+            print(' - Exiting program. Goodbye!')
+            mode = ''
+            element_choice = ''
+            localYN = 'QUIT'
+            return mode, element_choice, localYN
+        else:
+            print(f' - Incorrect input. Please enter {", ".join(menu_list)}, or Q\n')
 
 def main(args_):
     args = setup(args_)
@@ -250,40 +325,21 @@ def main(args_):
         txt_header = False
     outputDir = make_output_dir(source)
     while True:
-        main_menu(source)
-        choice = input('\nEnter your option: ').strip().upper()
-        elements = ['Type', 'Language', 'Responsible Party',
-                    'Media Identifier', 'Originating File',
-                    'File Creator', 'File Creation Date', 'Title',
-                    'Origin History', 'Local Usage Element']
-        element_dict = {str(index+1): element for index, element in enumerate(elements)}
-        menu_list = [str(x) for x in range(1,10)]
-        if choice in menu_list:
-            element_choice = element_dict[choice]
-            localYN = 'N'
-            revise_element(source, element_choice, outputDir, localYN)
-        elif choice == '10':
-            localYN = 'Y'
-            while True:
-                element_choice = input('\n\n**** Input name of local usage element:     ')
-                proceed_yn = ask_yes_no(f'New value: "Local Usage Element: {element_choice}". Is this correct?')
-                if proceed_yn == 'Y':
-                    revise_element(source, element_choice, outputDir, localYN)
-                    break
-                else:
-                    print('\nReturning to menu.')
-                    break
-        elif choice.upper() == 'N':
-            localYN = 'N'
-            m_csv = ""
-            element_choice = 'NOTE'
-            col_index = ""
-            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
-        elif choice.upper() == 'Q':
-            print(' - Exiting program. Goodbye!')
-            break
+        mode, element_choice, localYN = run_main(source, outputDir)
+        if localYN == 'N':
+            menu = revise_element(source, element_choice, outputDir, localYN)
+            print(f'menu: {menu}')
+            if menu != 'stay':
+                break
+        elif localYN == 'Y':
+            print(f'mode: {mode}')
+            print(f'element_choice: {element_choice}')
+            print(f'localYN: {localYN}')
+#             mode, element_choice, localYN = run_main(source, outputDir)
         else:
-            print(f' - Incorrect input. Please enter {", ".join(menu_list)}, or Q\n')
+            break
+
+            
 
 if __name__ == '__main__':
     main(sys.argv[1:])
