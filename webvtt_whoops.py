@@ -93,53 +93,44 @@ def revise_element(source, element_choice, outputDir, localYN):
         print('Q. Quit to main menu')
         print('\n')
         choice = input('Enter your option: ').strip().upper()
-        if choice == '1':
-            menu = 'getcsv'
-            return menu
-        elif choice == '2':
-            menu = 'update'
-            return menu
-        elif choice in ['Q', 'q']:
-            print(' - Returning to main menu')
-            menu = 'stay'
-            return menu
+        if choice in ['1', '2', 'Q', 'q']:
+            return choice
         else:
             print(' - Incorrect input. Please enter 1, 2, or Q')
 
-def get_csv_info(source, element_choice):
+def get_csv_info(source, element_choice, localYN):
     print('Revising from CSV')
-    m_csv = input('\n\n**** Enter CSV with full path):     ')
-    col_index = ''
-    if not os.path.isfile(m_csv):
-        print(f"'{m_csv}' is not a file.")
-        m_csv = ''
-        return m_csv, col_index
-    if not m_csv.endswith(".csv"):
-        print(f"'{m_csv}' is not a csv file.")
-        m_csv = ''
-        return m_csv, col_index
-    source = os.path.abspath(source)
-    print(m_csv)
-    with open(m_csv, 'r', encoding='UTF-8') as mFile:
-        mReader = csv.reader(mFile)
-        try:
-            header_row = next(mReader)
-            header_row_lower = [x.casefold() for x in header_row]
-            if element_choice.casefold() in header_row_lower:
-                col_index = header_row_lower.index(element_choice.casefold())
-                print(f'Element "{element_choice}" in header row {col_index}.')
-            else:
-                print(f'Element "{element_choice}" not found in header row.\n')
-                m_csv = ''
-            return m_csv, col_index
-        except StopIteration:
-            print('CSV is empty or has no headers.\n')
+    while True:
+        m_csv = input('\n\n**** Enter CSV with full path (or Q to return to main menu):     ')
+        col_index = ''
+        if m_csv in ['Q', 'q']:
             m_csv = ''
             return m_csv, col_index
+        if not (os.path.isfile(m_csv) and m_csv.endswith(".csv")):
+            print(f"'{m_csv}' is not a csv file.")
+            continue
+        source = os.path.abspath(source)
+        print(m_csv)
+        if localYN == 'Y':
+            element_choice = '_' + element_choice
+        with open(m_csv, 'r', encoding='UTF-8') as mFile:
+            mReader = csv.reader(mFile)
+            try:
+                header_row = next(mReader)
+                header_row_lower = [x.casefold() for x in header_row]
+                if element_choice.casefold() in header_row_lower:
+                    col_index = header_row_lower.index(element_choice.casefold())
+                    print(f'Element "{element_choice}" in header row {col_index}.')
+                else:
+                    print(f'Element "{element_choice}" not found in header row.\n')
+                    m_csv = ''
+                return m_csv, col_index
+            except StopIteration:
+                print('CSV is empty or has no headers.\n')
+                m_csv = ''
+                return m_csv, col_index
 
 def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode):
-    if localYN == 'Y':
-        element_choice = '_' + element_choice
     if m_csv == "" and element_choice != 'NOTE':
         while True:
             bulk_val = input(f'\n\n**** Input new value for element "{element_choice}":     ')
@@ -155,6 +146,8 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 status = 'mainmenu'
                 return status
     ext = ['.vtt', '.txt']
+#     if localYN == 'Y':
+#         element_choice = '_' + element_choice
     for vttfile in glob.glob(f'{source}/*{ext}'):
         if os.path.isfile(vttfile):
             justName = Path(vttfile).stem
@@ -172,7 +165,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
             count = count_file_header(vttfile, pattern, fileExt)
             line_count = -1
             if count != -1:
-                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice, localYN)
                 print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
             if m_csv != "":
                 new_val = find_file(outputName, m_csv, col_index)
@@ -183,6 +176,11 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 continue
             if any(x.endswith('\n') for x in elementline):
                 new_val = element_choice + ': ' + new_val + '\n'
+            if localYN == 'Y':
+                new_val = '_' + new_val
+                if elementline:
+                    print(f'orig_head: {orig_head}')
+                    print(f'elementline: {elementline}')
             if mode == 'overwrite':
                 print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
                 orig_head = [new_val if x in elementline else x for x in orig_head]
@@ -244,7 +242,7 @@ def count_file_header(vttfile, pattern, fileExt):
                     if fileExt == '.txt' and found == 'yes':
                         matches = []
                         nl_str = '\n'
-                        for line_num, line in enumerate(islice(input, count, None)):
+                        for line_num, line in enumerate(islice(input, None)):
                             if line == nl_str:
                                 matches.append(line_num)
                                 if len(matches) == 1:
@@ -261,7 +259,7 @@ def count_file_header(vttfile, pattern, fileExt):
         print('no FADGI header detected in file')
         return -1
 
-def find_element_header(count, vttfile, element_choice):
+def find_element_header(count, vttfile, element_choice, localYN):
     elementline = []
     orig_head = []
     line_count = []
@@ -270,9 +268,17 @@ def find_element_header(count, vttfile, element_choice):
             if i >= count:
                 break
             orig_head.append(line)
-            if line.casefold().startswith(element_choice.casefold()):
-                elementline.append(line)
-                line_count.append(i)
+            if localYN == 'Y':
+                if line.casefold().startswith('Local Usage Element'.casefold()) and element_choice.casefold() in line:
+                    elementline.append(line)
+                    line_count.append(i)
+                if line.casefold().startswith(('_'+element_choice).casefold()):
+                    elementline.append(line)
+                    line_count.append(i)
+            else:
+                if line.casefold().startswith(element_choice.casefold()):
+                    elementline.append(line)
+                    line_count.append(i)
     if not line_count:
         line_count = -1
     else:
@@ -334,7 +340,7 @@ def run_main(source, outputDir):
         elif choice == '10':
             localYN = 'Y'
             while True:
-                element_choice = input('\n\n**** Input name of local usage element:     ')
+                element_choice = input('\n\n**** Input name of local usage element (without underscore prefix):     ')
                 proceed_yn = ask_yes_no(f'Local usage element: "{element_choice}". Is this correct?')
                 if proceed_yn == 'Y':
                     mode = append_or_overwrite(source, element_choice, localYN)
@@ -350,9 +356,9 @@ def run_main(source, outputDir):
             update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
         elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
-            mode = ''
+            mode = 'QUIT'
             element_choice = ''
-            localYN = 'QUIT'
+            localYN = ''
             return mode, element_choice, localYN
         else:
             print(f' - Incorrect input. Please enter {", ".join(menu_list)}, or Q\n')
@@ -372,28 +378,27 @@ def main(args_):
     outputDir = make_output_dir(source)
     while True:
         mode, element_choice, localYN = run_main(source, outputDir)
-        if localYN == 'N':
-            menu = revise_element(source, element_choice, outputDir, localYN)
-            print(f'menu: {menu}')
-            if menu == 'getcsv':
-                m_csv, col_index = get_csv_info(source, element_choice)
-                if col_index == '':
-                    continue
-                if col_index != '':
-                    status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
-            elif menu == 'update':
-                m_csv = ''
-                col_index = ''
+        if mode == 'quit':
+            continue
+        if mode == 'QUIT':
+            break
+        choice = revise_element(source, element_choice, outputDir, localYN)
+        print(f'choice: {choice}')
+        if choice == '1':
+            m_csv, col_index = get_csv_info(source, element_choice, localYN)
+            if col_index == '':
+                continue
+            if col_index != '':
                 status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
-                if status == 'mainmenu':
-                    continue
-            if menu != 'stay':
-                break
-        elif localYN == 'Y':
-            print(f'mode: {mode}')
-            print(f'element_choice: {element_choice}')
-            print(f'localYN: {localYN}')
-#             mode, element_choice, localYN = run_main(source, outputDir)
+        elif choice == '2':
+            m_csv = ''
+            col_index = ''
+            status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
+            if status == 'mainmenu':
+                continue
+        elif choice in ['Q', 'q']:
+            print(' - Returning to main menu')
+            continue
         else:
             break
 
