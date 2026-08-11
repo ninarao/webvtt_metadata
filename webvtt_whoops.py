@@ -8,10 +8,12 @@ import csv
 import re
 import argparse
 import shutil
+from itertools import islice
 
 sys.argv = [
    'webvtt_whoops.py',
-   '/Users/nraogra/Desktop/webvtt_v2'
+   '/Users/nraogra/Desktop/webvtt_v2', 
+   '-t'
    ]
 # /Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv
 
@@ -135,13 +137,17 @@ def get_csv_info(source, element_choice):
             m_csv = ''
             return m_csv, col_index
 
-def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header):
+def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode):
     if localYN == 'Y':
         element_choice = '_' + element_choice
     if m_csv == "" and element_choice != 'NOTE':
         while True:
             bulk_val = input(f'\n\n**** Input new value for element "{element_choice}":     ')
-            proceed_yn = ask_yes_no(f'New value: "{bulk_val}". Update header element to "{element_choice}: {bulk_val}" for all WebVTT files in directory?')
+            if mode == 'append':
+                print(f'New value: "{bulk_val}". Append "{element_choice}: {bulk_val}" to header.')
+            elif mode == 'overwrite':
+                print(f'New value: "{bulk_val}". Overwrite existing "{element_choice}" value(s) with "{element_choice}: {bulk_val}".')
+            proceed_yn = ask_yes_no(f'Proceed?')
             if proceed_yn == 'Y':
                 break
             else:
@@ -160,11 +166,39 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
             elif fileExt == '.txt' and txt_header == True:
                 outputName = justName + ".txt"
                 print(outputName)
-                pattern = r'^Local Usage Element:'
+                pattern = r'^Type:'
             else:
                 continue
-            count = count_file_header(vttfile, pattern)
-            elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+            count = count_file_header(vttfile, pattern, fileExt)
+            line_count = -1
+            if count != -1:
+                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice)
+                print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+            if m_csv != "":
+                new_val = find_file(outputName, m_csv, col_index)
+            else:
+                new_val = bulk_val
+            if m_csv != "" and new_val == '':
+                print(f'{outputName}: file not found in csv, skipping file.')
+                continue
+            if any(x.endswith('\n') for x in elementline):
+                new_val = element_choice + ': ' + new_val + '\n'
+            if mode == 'overwrite':
+                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
+                orig_head = [new_val if x in elementline else x for x in orig_head]
+                new_head = []
+                dupes_found = False
+                for x in orig_head:
+                    if x == new_val:
+                        if not dupes_found:
+                            new_head.append(x)
+                            dupes_found = True
+                    else:
+                        new_head.append(x)
+            if mode == 'append':
+                print(f'{outputName}: Additional value for element "{element_choice}": "{new_val}"')
+                orig_head.insert(line_count+1, new_val)
+                new_head = orig_head
             if element_choice == 'NOTE':
                 line_count = count - 1
                 if elementline == "":
@@ -184,59 +218,65 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                     print(f'{outputName}: "{element_choice}" found in header, skipping file.')
                     continue
             else:
-                if elementline == "":
+                if elementline == "" or line_count == -1:
                     print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
                     continue
-                if line_count != -1:
-                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-                if m_csv != "":
-                    new_val = find_file(outputName, m_csv, col_index)
-                else:
-                    new_val = bulk_val
-                if m_csv != "" and new_val == '':
-                    print(f'{outputName}: file not found in csv, skipping file.')
-                    continue
-                if elementline.endswith('\n'):
-                    new_val = element_choice + ': ' + new_val + '\n'
-                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
-                new_head = [new_val if x == elementline else x for x in orig_head]
             newfile = os.path.join(outputDir, outputName)
             with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
                 for item in new_head:
                     f_out.write(item)
-                for _ in range(line_count+1):
+                for _ in range(count):
                     next(f_in, None)
                 shutil.copyfileobj(f_in, f_out)
             f_in.close()
             f_out.close()
         
-def count_file_header(vttfile, pattern):
+def count_file_header(vttfile, pattern, fileExt):
     count = 0
+    found = ''
     try:
         with open(vttfile, 'r', encoding='UTF-8') as input:
             for line in input:
                 count += 1
                 if re.search(pattern, line):
                     count -= 1
+                    found = 'yes'
+                    if fileExt == '.txt' and found == 'yes':
+                        matches = []
+                        nl_str = '\n'
+                        for line_num, line in enumerate(islice(input, count, None)):
+                            if line == nl_str:
+                                matches.append(line_num)
+                                if len(matches) == 1:
+                                    break
+                        if len(matches) == 1:
+                            count = matches[0] + count + 1
                     input.close()
+                    print(f'FADGI header found: {count} lines')
                     return count
     except Exception:
         print('header line count error')
         return -1
+    if found == '':
+        print('no FADGI header detected in file')
+        return -1
 
 def find_element_header(count, vttfile, element_choice):
-    elementline = ""
+    elementline = []
     orig_head = []
-    line_count = -1
+    line_count = []
     with open(vttfile, 'r', encoding='UTF-8') as input:
         for i, line in enumerate(input):
             if i >= count:
                 break
             orig_head.append(line)
-            if element_choice in line:
-                elementline = line
-                line_count = i
-                break
+            if line.casefold().startswith(element_choice.casefold()):
+                elementline.append(line)
+                line_count.append(i)
+    if not line_count:
+        line_count = -1
+    else:
+        line_count = max(line_count)
     return elementline, orig_head, line_count
 
 def find_file(outputName, m_csv, col_index):
@@ -279,17 +319,16 @@ def run_main(source, outputDir):
         element_dict = {str(index+1): element for index, element in enumerate(elements)}
         menu_list = [str(x) for x in range(1,10)]
         repeatable_list = [str(x) for x in [2, 3, 4, 6, 9]]
+        localYN = 'N'
         if choice in repeatable_list:
             element_choice = element_dict[choice]
-            localYN = 'N'
             mode = append_or_overwrite(source, element_choice, localYN)
             print(f'mode: {mode}')
             if mode in ('append', 'overwrite'):
                 return mode, element_choice, localYN
         elif choice in menu_list:
             element_choice = element_dict[choice]
-            localYN = 'N'
-            mode = ''
+            mode = 'overwrite'
             print(f'mode: {mode}')
             return mode, element_choice, localYN
         elif choice == '10':
@@ -305,11 +344,10 @@ def run_main(source, outputDir):
                     print('\nReturning to main menu.')
                     break
         elif choice.upper() == 'N':
-            localYN = 'N'
             m_csv = ""
             element_choice = 'NOTE'
             col_index = ""
-            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
         elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
             mode = ''
@@ -342,11 +380,11 @@ def main(args_):
                 if col_index == '':
                     continue
                 if col_index != '':
-                    status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+                    status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
             elif menu == 'update':
                 m_csv = ''
                 col_index = ''
-                status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header)
+                status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
                 if status == 'mainmenu':
                     continue
             if menu != 'stay':
@@ -358,8 +396,6 @@ def main(args_):
 #             mode, element_choice, localYN = run_main(source, outputDir)
         else:
             break
-
-            
 
 if __name__ == '__main__':
     main(sys.argv[1:])
