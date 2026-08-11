@@ -8,7 +8,7 @@ import csv
 import re
 import argparse
 import shutil
-from itertools import islice
+from itertools import islice, chain
 
 sys.argv = [
    'webvtt_whoops.py',
@@ -181,6 +181,12 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 if elementline:
                     print(f'orig_head: {orig_head}')
                     print(f'elementline: {elementline}')
+#                     new_locals = [item.replace("Local Usage Element: ", "") for item in elementline]
+#                     string = [item.split('; ') for item in new_locals]
+#                     flatlist = list(chain.from_iterable(string))
+#                     flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
+#                     flatlist = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
+#                     print(f'flatlist: {flatlist}')
             if mode == 'overwrite':
                 print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
                 orig_head = [new_val if x in elementline else x for x in orig_head]
@@ -283,6 +289,13 @@ def find_element_header(count, vttfile, element_choice, localYN):
         line_count = -1
     else:
         line_count = max(line_count)
+    if orig_head:
+        new_locals = [item.replace("Local Usage Element: ", "") for item in orig_head]
+        string = [item.split('; ') for item in new_locals]
+        flatlist = list(chain.from_iterable(string))
+        flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
+        orig_head = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
+        print(f'orig_head: {orig_head}')
     return elementline, orig_head, line_count
 
 def find_file(outputName, m_csv, col_index):
