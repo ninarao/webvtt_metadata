@@ -146,8 +146,6 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 status = 'mainmenu'
                 return status
     ext = ['.vtt', '.txt']
-#     if localYN == 'Y':
-#         element_choice = '_' + element_choice
     for vttfile in glob.glob(f'{source}/*{ext}'):
         if os.path.isfile(vttfile):
             justName = Path(vttfile).stem
@@ -178,15 +176,6 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 new_val = element_choice + ': ' + new_val + '\n'
             if localYN == 'Y':
                 new_val = '_' + new_val
-                if elementline:
-                    print(f'orig_head: {orig_head}')
-                    print(f'elementline: {elementline}')
-#                     new_locals = [item.replace("Local Usage Element: ", "") for item in elementline]
-#                     string = [item.split('; ') for item in new_locals]
-#                     flatlist = list(chain.from_iterable(string))
-#                     flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
-#                     flatlist = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
-#                     print(f'flatlist: {flatlist}')
             if mode == 'overwrite':
                 print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
                 orig_head = [new_val if x in elementline else x for x in orig_head]
@@ -274,28 +263,33 @@ def find_element_header(count, vttfile, element_choice, localYN):
             if i >= count:
                 break
             orig_head.append(line)
-            if localYN == 'Y':
-                if line.casefold().startswith('Local Usage Element'.casefold()) and element_choice.casefold() in line:
-                    elementline.append(line)
-                    line_count.append(i)
-                if line.casefold().startswith(('_'+element_choice).casefold()):
-                    elementline.append(line)
-                    line_count.append(i)
-            else:
-                if line.casefold().startswith(element_choice.casefold()):
-                    elementline.append(line)
-                    line_count.append(i)
+        if orig_head:
+            new_locals = [item.replace("Local Usage Element: ", "") for item in orig_head]
+            string = [item.split('; ') for item in new_locals]
+            flatlist = list(chain.from_iterable(string))
+            flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
+            flatlist = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
+            make_title_case = ['_software version', '_review history']
+            for i, x in enumerate(flatlist):
+                if x.casefold().startswith(tuple(make_title_case)):
+                    for y in make_title_case:
+                        if x.casefold().startswith(y):
+                            flatlist[i] = x[:len(y)].title() + x[len(y):]
+                            break
+            orig_head = [x + '\n' if not x.endswith('\n') else x for x in flatlist]
+            for i, line in enumerate(orig_head):
+                if localYN == 'Y':
+                    if line.casefold().startswith(('_'+element_choice).casefold()):
+                        elementline.append(line)
+                        line_count.append(i)
+                else:
+                    if line.casefold().startswith(element_choice.casefold()):
+                        elementline.append(line)
+                        line_count.append(i)
     if not line_count:
         line_count = -1
     else:
         line_count = max(line_count)
-    if orig_head:
-        new_locals = [item.replace("Local Usage Element: ", "") for item in orig_head]
-        string = [item.split('; ') for item in new_locals]
-        flatlist = list(chain.from_iterable(string))
-        flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
-        orig_head = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
-        print(f'orig_head: {orig_head}')
     return elementline, orig_head, line_count
 
 def find_file(outputName, m_csv, col_index):
