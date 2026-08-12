@@ -88,8 +88,8 @@ def revise_element(source, element_choice, outputDir, localYN):
         print(f'\nWebVTT directory: {source}')
         print(f'Element selected: {element_choice}')
         print('\nWhat would you like to do?')
-        print('1. Revise element from CSV (will match on WebVTT filenames)')
-        print('2. Input new element value (will apply same value to all WebVTT files)')
+        print('1. Revise element from CSV (will match on source file names)')
+        print('2. Input new element value (will apply same value to all files)')
         print('Q. Quit to main menu')
         print('\n')
         choice = input('Enter your option: ').strip().upper()
@@ -138,7 +138,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 print(f'New value: "{bulk_val}". Append "{element_choice}: {bulk_val}" to header.')
             elif mode == 'overwrite':
                 print(f'New value: "{bulk_val}". Overwrite existing "{element_choice}" value(s) with "{element_choice}: {bulk_val}".')
-            proceed_yn = ask_yes_no(f'Proceed?')
+            proceed_yn = ask_yes_no('Proceed?')
             if proceed_yn == 'Y':
                 break
             else:
@@ -146,10 +146,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 status = 'mainmenu'
                 return status
     ext = ['.vtt', '.txt']
-    for vttfile in glob.glob(f'{source}/*{ext}'):
-        if os.path.isfile(vttfile):
-            justName = Path(vttfile).stem
-            fileExt = Path(vttfile).suffix
+    for sourcefile in glob.glob(f'{source}/*{ext}'):
+        if os.path.isfile(sourcefile):
+            justName = Path(sourcefile).stem
+            fileExt = Path(sourcefile).suffix
             if fileExt == '.vtt':
                 outputName = justName + ".vtt"
                 print(outputName)
@@ -160,18 +160,20 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 pattern = r'^Type:'
             else:
                 continue
-            count = count_file_header(vttfile, pattern, fileExt)
-            line_count = -1
-            if count != -1:
-                elementline, orig_head, line_count = find_element_header(count, vttfile, element_choice, localYN)
-                print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
             if m_csv != "":
                 new_val = find_file(outputName, m_csv, col_index)
+                if new_val == 'nomatch':
+                    print(f'{outputName}: file not found in csv, skipping file.')
+                    continue
+            elif element_choice == 'NOTE':
+                new_val = 'NOTE\n'
             else:
-                new_val = bulk_val
-            if m_csv != "" and new_val == '':
-                print(f'{outputName}: file not found in csv, skipping file.')
-                continue
+                new_val = bulk_val                
+            count = count_file_header(sourcefile, pattern, fileExt)
+            line_count = -1
+            if count != -1:
+                elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
+                print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
             if any(x.endswith('\n') for x in elementline):
                 new_val = element_choice + ': ' + new_val + '\n'
             if localYN == 'Y':
@@ -215,7 +217,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                     print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
                     continue
             newfile = os.path.join(outputDir, outputName)
-            with open(vttfile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+            with open(sourcefile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
                 for item in new_head:
                     f_out.write(item)
                 for _ in range(count):
@@ -223,12 +225,14 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 shutil.copyfileobj(f_in, f_out)
             f_in.close()
             f_out.close()
+    status = 'mainmenu'
+    return status
         
-def count_file_header(vttfile, pattern, fileExt):
+def count_file_header(sourcefile, pattern, fileExt):
     count = 0
     found = ''
     try:
-        with open(vttfile, 'r', encoding='UTF-8') as input:
+        with open(sourcefile, 'r', encoding='UTF-8') as input:
             for line in input:
                 count += 1
                 if re.search(pattern, line):
@@ -254,11 +258,11 @@ def count_file_header(vttfile, pattern, fileExt):
         print('no FADGI header detected in file')
         return -1
 
-def find_element_header(count, vttfile, element_choice, localYN):
+def find_element_header(count, sourcefile, element_choice, localYN):
     elementline = []
     orig_head = []
     line_count = []
-    with open(vttfile, 'r', encoding='UTF-8') as input:
+    with open(sourcefile, 'r', encoding='UTF-8') as input:
         for i, line in enumerate(input):
             if i >= count:
                 break
@@ -302,11 +306,11 @@ def find_file(outputName, m_csv, col_index):
                 new_val = row[col_index]
                 return new_val
         if not match:
-            new_val = ''
+            new_val = 'nomatch'
             return new_val
 
 def main_menu(source):
-    print(f'\nWebVTT directory: {source}')
+    print(f'\nSource directory: {source}')
     print('\nWhich element would you like to revise?\n')
     print('1. Type')
     print('2. Language')
@@ -318,7 +322,7 @@ def main_menu(source):
     print('8. Title')
     print('9. Origin History')
     print('10. Local Usage Element (any)')
-    print('N. Add NOTE if missing from header')
+    print('N. Add NOTE to .vtt files if missing from header')
     print('Q. Quit')
     
 def run_main(source, outputDir):
@@ -357,10 +361,9 @@ def run_main(source, outputDir):
                     print('\nReturning to main menu.')
                     break
         elif choice.upper() == 'N':
-            m_csv = ""
+            mode = 'note'
             element_choice = 'NOTE'
-            col_index = ""
-            update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
+            return mode, element_choice, localYN
         elif choice.upper() == 'Q':
             print(' - Exiting program. Goodbye!')
             mode = 'QUIT'
@@ -377,18 +380,25 @@ def main(args_):
         print(f"No directory {source} exists, exiting program.")
         sys.exit()
     if args.txtheader == True:
-        print("\nActions will be applied to txt and vtt files.")
+        print("\nActions will be applied to .txt and .vtt files.")
         txt_header = True
     else:
-        print("\nActions will be applied to vtt files.")
+        print("\nActions will be applied to .vtt files.")
         txt_header = False
     outputDir = make_output_dir(source)
     while True:
+        status = ''
         mode, element_choice, localYN = run_main(source, outputDir)
         if mode == 'quit':
             continue
         if mode == 'QUIT':
             break
+        if mode == 'note':
+            m_csv = ''
+            col_index = ''
+            status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
+        if status == 'mainmenu':
+            continue
         choice = revise_element(source, element_choice, outputDir, localYN)
         print(f'choice: {choice}')
         if choice == '1':
@@ -401,8 +411,8 @@ def main(args_):
             m_csv = ''
             col_index = ''
             status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
-            if status == 'mainmenu':
-                continue
+        if status == 'mainmenu':
+            continue
         elif choice in ['Q', 'q']:
             print(' - Returning to main menu')
             continue
