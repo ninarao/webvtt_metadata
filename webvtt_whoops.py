@@ -173,9 +173,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
             line_count = -1
             if count != -1:
                 elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
-                print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-            if any(x.endswith('\n') for x in elementline):
-                new_val = element_choice + ': ' + new_val + '\n'
+                if elementline:
+                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+                    if any(x.endswith('\n') for x in elementline):
+                        new_val = element_choice + ': ' + new_val + '\n'
             if localYN == 'Y':
                 new_val = '_' + new_val
             if mode == 'overwrite':
@@ -213,7 +214,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                     print(f'{outputName}: "{element_choice}" found in header, skipping file.')
                     continue
             else:
-                if elementline == "" or line_count == -1:
+                if count == -1 and line_count == -1:
                     print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
                     continue
             newfile = os.path.join(outputDir, outputName)
