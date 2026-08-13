@@ -175,8 +175,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
                 if elementline:
                     print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-                    if any(x.endswith('\n') for x in elementline):
-                        new_val = element_choice + ': ' + new_val + '\n'
+#                     if any(x.endswith('\n') for x in elementline):
+#                         new_val = element_choice + ': ' + new_val + '\n'
+#                 else:
+                new_val = element_choice + ': ' + new_val + '\n'
             if localYN == 'Y':
                 new_val = '_' + new_val
             if mode == 'overwrite':
@@ -193,8 +195,21 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                         new_head.append(x)
             if mode == 'append':
                 print(f'{outputName}: Additional value for element "{element_choice}": "{new_val}"')
-                orig_head.insert(line_count+1, new_val)
+                if line_count == -1 and localYN == 'Y':
+                    orig_head.insert(count, new_val)
+                elif line_count == -1 and localYN == 'N':
+                    for i, line in enumerate(orig_head):
+                        if line.startswith('_'):
+                            insertpoint = i
+                            break
+                    if insertpoint:
+                        orig_head.insert(insertpoint, new_val)
+                    else:
+                        orig_head.insert(count, new_val)
+                elif line_count != -1:
+                    orig_head.insert(line_count+1, new_val)
                 new_head = orig_head
+                print(new_head)
             if element_choice == 'NOTE':
                 line_count = count - 1
                 if elementline == "":
@@ -239,6 +254,8 @@ def count_file_header(sourcefile, pattern, fileExt):
                 if re.search(pattern, line):
                     count -= 1
                     found = 'yes'
+                    if fileExt == '.vtt' and found == 'yes':
+                        count -= 1
                     if fileExt == '.txt' and found == 'yes':
                         matches = []
                         nl_str = '\n'
