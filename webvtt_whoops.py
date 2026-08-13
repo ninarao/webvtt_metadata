@@ -181,7 +181,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 new_val = element_choice + ': ' + new_val + '\n'
             if localYN == 'Y':
                 new_val = '_' + new_val
-            if mode == 'overwrite':
+            if mode == 'overwrite' and elementline:
                 print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
                 orig_head = [new_val if x in elementline else x for x in orig_head]
                 new_head = []
@@ -193,21 +193,19 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                             dupes_found = True
                     else:
                         new_head.append(x)
-            if mode == 'append':
+            else:
                 print(f'{outputName}: Additional value for element "{element_choice}": "{new_val}"')
-                if line_count == -1 and localYN == 'Y':
-                    orig_head.insert(count, new_val)
-                elif line_count == -1 and localYN == 'N':
+                if line_count != -1:
+                    orig_head.insert(line_count+1, new_val)
+                else:
                     for i, line in enumerate(orig_head):
                         if line.startswith('_'):
                             insertpoint = i
                             break
-                    if insertpoint:
+                    if insertpoint and localYN == 'N':
                         orig_head.insert(insertpoint, new_val)
                     else:
                         orig_head.insert(count, new_val)
-                elif line_count != -1:
-                    orig_head.insert(line_count+1, new_val)
                 new_head = orig_head
                 print(new_head)
             if element_choice == 'NOTE':
