@@ -168,69 +168,73 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
             elif element_choice == 'NOTE':
                 new_val = 'NOTE\n'
             else:
-                new_val = bulk_val                
+                new_val = bulk_val
+            if mode == 'note' and fileExt == '.txt':
+                print(f'{outputName}: skipping .txt file.')
+                continue
             count = count_file_header(sourcefile, pattern, fileExt)
-            line_count = -1
-            if count != -1:
-                elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
-                if elementline:
-                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
-#                     if any(x.endswith('\n') for x in elementline):
-#                         new_val = element_choice + ': ' + new_val + '\n'
-#                 else:
-                new_val = element_choice + ': ' + new_val + '\n'
-            if localYN == 'Y':
-                new_val = '_' + new_val
-            if mode == 'overwrite' and elementline:
-                print(f'{outputName}: New value for element "{element_choice}": "{new_val}"')
-                orig_head = [new_val if x in elementline else x for x in orig_head]
-                new_head = []
-                dupes_found = False
-                for x in orig_head:
-                    if x == new_val:
-                        if not dupes_found:
-                            new_head.append(x)
-                            dupes_found = True
-                    else:
-                        new_head.append(x)
-            else:
-                print(f'{outputName}: Additional value for element "{element_choice}": "{new_val}"')
-                if line_count != -1:
-                    orig_head.insert(line_count+1, new_val)
+            if count == -2:
+                print(f'{outputName}: timestamps not found in .vtt file, skipping file.')
+                continue
+            elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
+            if (count == 1 and fileExt == '.vtt') or count == -1 or count == -3:
+                if mode == 'note':
+                    print(f'{outputName}: no FADGI header detected, skipping file')
+                    continue
                 else:
-                    for i, line in enumerate(orig_head):
-                        if line.startswith('_'):
-                            insertpoint = i
-                            break
-                    if insertpoint and localYN == 'N':
-                        orig_head.insert(insertpoint, new_val)
-                    else:
-                        orig_head.insert(count, new_val)
+                    print(f'{outputName}: no FADGI header detected in file')
+            else:
+                print(f'{outputName}: FADGI header found: {count} lines')
+            if mode == 'note':
+                if elementline:
+                    orig_head[line_count] = new_val
+                else:
+                    print(orig_head)
+                    orig_head.insert(2, new_val)
                 new_head = orig_head
                 print(new_head)
-            if element_choice == 'NOTE':
-                line_count = count - 1
-                if elementline == "":
-                    print(f'{outputName}: "{element_choice}" not found, adding to header')
-                    try:
-                        index = [i for i, s in enumerate(orig_head) if 'Type' in s]
-                    except ValueError:
-                        print('error: not found')
-                    if index:
-                        index_int = index[0]
-                    else:
-                        index_int = 0
-                    new_val = 'NOTE\n'
-                    orig_head.insert(index_int, new_val)
-                    new_head = orig_head
-                elif elementline != "":
-                    print(f'{outputName}: "{element_choice}" found in header, skipping file.')
-                    continue
             else:
-                if count == -1 and line_count == -1:
-                    print(f'{outputName}: Element "{element_choice}" not found in header, skipping file.')
-                    continue
+                if elementline:
+                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
+                new_val = element_choice + ': ' + new_val + '\n'
+                if localYN == 'Y':
+                    new_val = '_' + new_val
+                print(f'{outputName}: Adding "{element_choice}": "{new_val}"')
+                if mode == 'overwrite' and elementline:
+                    orig_head = [new_val if x in elementline else x for x in orig_head]
+                    new_head = []
+                    dupes_found = False
+                    for x in orig_head:
+                        if x == new_val:
+                            if not dupes_found:
+                                new_head.append(x)
+                                dupes_found = True
+                        else:
+                            new_head.append(x)
+                else:
+                    if line_count != -1:
+                        orig_head.insert(line_count+1, new_val)
+                    elif count == -1 or count == -3:
+                        orig_head.insert(0, new_val)
+                        orig_head.insert(1, '\n')
+                    elif count == 1 and fileExt == '.vtt':
+                        orig_head.insert(1, '\n')
+                        orig_head.insert(2, 'NOTE\n')
+                        orig_head.insert(3, new_val)
+                    else:
+                        insertpoint = ''
+                        for i, line in enumerate(orig_head):
+                            if line.startswith('_'):
+                                insertpoint = i
+                                break
+                        if insertpoint != '' and localYN == 'N':
+                            orig_head.insert(insertpoint, new_val)
+                        else:
+                            orig_head.insert(count, new_val)
+                    new_head = orig_head
             newfile = os.path.join(outputDir, outputName)
+            if count == -3:
+                count = 2
             with open(sourcefile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
                 for item in new_head:
                     f_out.write(item)
@@ -245,10 +249,13 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
 def count_file_header(sourcefile, pattern, fileExt):
     count = 0
     found = ''
+    webvtt = 'no'
     try:
         with open(sourcefile, 'r', encoding='UTF-8') as input:
             for line in input:
                 count += 1
+                if re.search('WEBVTT\n', line):
+                    webvtt = 'yes'
                 if re.search(pattern, line):
                     count -= 1
                     found = 'yes'
@@ -265,14 +272,16 @@ def count_file_header(sourcefile, pattern, fileExt):
                         if len(matches) == 1:
                             count = matches[0] + count + 1
                     input.close()
-                    print(f'FADGI header found: {count} lines')
                     return count
     except Exception:
         print('header line count error')
         return -1
-    if found == '':
-        print('no FADGI header detected in file')
+    if found == '' and fileExt == '.vtt':
+        return -2
+    if found == '' and webvtt == 'no' and fileExt == '.txt':
         return -1
+    if found == '' and webvtt == 'yes' and fileExt == '.txt':
+        return -3
 
 def find_element_header(count, sourcefile, element_choice, localYN):
     elementline = []
@@ -350,7 +359,7 @@ def run_main(source, outputDir):
                     'File Creator', 'File Creation Date', 'Title',
                     'Origin History', 'Local Usage Element']
         element_dict = {str(index+1): element for index, element in enumerate(elements)}
-        menu_list = [str(x) for x in range(1,10)]
+        menu_list = [str(x) for x in [1, 5, 7, 8]]
         repeatable_list = [str(x) for x in [2, 3, 4, 6, 9]]
         localYN = 'N'
         if choice in repeatable_list:
