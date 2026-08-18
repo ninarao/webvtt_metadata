@@ -9,6 +9,7 @@ import re
 import argparse
 import shutil
 from itertools import islice, chain
+import datetime
 
 sys.argv = [
    'webvtt_whoops.py',
@@ -47,6 +48,14 @@ def ask_yes_no(question):
             return 'Y'
         elif answer in ('N,' 'n'):
             return 'N'
+
+def generate_log(log, what2log):
+    if not os.path.isfile(log):
+        with open(log, "w", encoding='utf-8') as f:
+            f.write(what2log + '\n')
+    else:
+        with open(log, "a", encoding='utf-8') as f:
+            f.write(what2log + '\n')
 
 def make_output_dir(source):
     outputDir = os.path.join(source, 'metadata_updated')
@@ -110,7 +119,6 @@ def get_csv_info(source, element_choice, localYN):
             print(f"'{m_csv}' is not a csv file.")
             continue
         source = os.path.abspath(source)
-        print(m_csv)
         if localYN == 'Y':
             element_choice = '_' + element_choice
         with open(m_csv, 'r', encoding='UTF-8') as mFile:
@@ -131,6 +139,11 @@ def get_csv_info(source, element_choice, localYN):
                 return m_csv, col_index
 
 def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode):
+    timenow = datetime.datetime.now()
+    logname = f'webvtt_whoops_log_{timenow.strftime("%y-%m-%d_%Hh%Mm%Ss")}.txt'
+    log_source = os.path.join(outputDir, logname)
+    files_updated = []
+    files_skipped = []
     if m_csv == "" and element_choice != 'NOTE':
         while True:
             bulk_val = input(f'\n\n**** Input new value for element "{element_choice}":     ')
@@ -152,11 +165,9 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
             fileExt = Path(sourcefile).suffix
             if fileExt == '.vtt':
                 outputName = justName + ".vtt"
-                print(outputName)
                 pattern = r'(\d{2}:\d{2}.\d{3} --> )'
             elif fileExt == '.txt' and txt_header == True:
                 outputName = justName + ".txt"
-                print(outputName)
                 pattern = r'^Type:'
             else:
                 continue
@@ -164,6 +175,7 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 new_val = find_file(outputName, m_csv, col_index)
                 if new_val == 'nomatch':
                     print(f'{outputName}: file not found in csv, skipping file.')
+                    files_skipped.append(outputName)
                     continue
             elif element_choice == 'NOTE':
                 new_val = 'NOTE\n'
@@ -171,20 +183,19 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 new_val = bulk_val
             if mode == 'note' and fileExt == '.txt':
                 print(f'{outputName}: skipping .txt file.')
+                files_skipped.append(outputName)
                 continue
             count = count_file_header(sourcefile, pattern, fileExt)
             if count == -2:
                 print(f'{outputName}: timestamps not found in .vtt file, skipping file.')
+                files_skipped.append(outputName)
                 continue
             elementline, orig_head, line_count = find_element_header(count, sourcefile, element_choice, localYN)
             if (count == 1 and fileExt == '.vtt') or count == -1 or count == -3:
                 if mode == 'note':
                     print(f'{outputName}: no FADGI header detected, skipping file')
+                    files_skipped.append(outputName)
                     continue
-                else:
-                    print(f'{outputName}: no FADGI header detected in file')
-            else:
-                print(f'{outputName}: FADGI header found: {count} lines')
             if mode == 'note':
                 if elementline:
                     orig_head[line_count] = new_val
@@ -194,12 +205,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 new_head = orig_head
                 print(new_head)
             else:
-                if elementline:
-                    print(f'{outputName}: Element "{element_choice}" found in header line: {elementline}')
                 new_val = element_choice + ': ' + new_val + '\n'
                 if localYN == 'Y':
                     new_val = '_' + new_val
-                print(f'{outputName}: Adding "{element_choice}": "{new_val}"')
+                print(f'{outputName}: {mode} "{element_choice}" with "{new_val}"')
                 if mode == 'overwrite' and elementline:
                     orig_head = [new_val if x in elementline else x for x in orig_head]
                     new_head = []
@@ -243,6 +252,19 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
                 shutil.copyfileobj(f_in, f_out)
             f_in.close()
             f_out.close()
+            files_updated.append(outputName)
+    generate_log(log_source, 'WebVTT metadata log for ' + outputDir + '\n')
+    if files_skipped:
+        generate_log(log_source, 'Files skipped:')
+        for item in files_skipped:
+            generate_log(log_source, item)
+    if files_skipped and files_updated:
+        generate_log(log_source, '')
+    if files_updated:
+        generate_log(log_source, 'Files updated:')
+        for item in files_updated:
+            generate_log(log_source, item)
+    generate_log(log_source, '\nFinished running at ' + timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
     status = 'mainmenu'
     return status
         
@@ -365,13 +387,11 @@ def run_main(source, outputDir):
         if choice in repeatable_list:
             element_choice = element_dict[choice]
             mode = append_or_overwrite(source, element_choice, localYN)
-            print(f'mode: {mode}')
             if mode in ('append', 'overwrite'):
                 return mode, element_choice, localYN
         elif choice in menu_list:
             element_choice = element_dict[choice]
             mode = 'overwrite'
-            print(f'mode: {mode}')
             return mode, element_choice, localYN
         elif choice == '10':
             localYN = 'Y'
@@ -425,7 +445,6 @@ def main(args_):
         if status == 'mainmenu':
             continue
         choice = revise_element(source, element_choice, outputDir, localYN)
-        print(f'choice: {choice}')
         if choice == '1':
             m_csv, col_index = get_csv_info(source, element_choice, localYN)
             if col_index == '':
