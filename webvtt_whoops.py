@@ -73,7 +73,7 @@ def append_or_overwrite(source, element_choice, localYN):
         if localYN == 'N':
             print(f'\n{element_choice} is a repeatable element. Would you like to append to or overwrite existing values?\n')
         else:
-            print(f'\nFor local usage element "{element_choice}" would you like to append to or overwrite existing values?\n')
+            print(f'\nFor local usage element "_{element_choice}" would you like to append to or overwrite existing values?\n')
         print('1. Append')
         print('2. Overwrite')
         print('Q. Quit to main menu')
@@ -147,10 +147,10 @@ def update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt
     if m_csv == "" and element_choice != 'NOTE':
         while True:
             bulk_val = input(f'\n\n**** Input new value for element "{element_choice}":     ')
-            if mode == 'append':
-                print(f'New value: "{bulk_val}". Append "{element_choice}: {bulk_val}" to header.')
-            elif mode == 'overwrite':
-                print(f'New value: "{bulk_val}". Overwrite existing "{element_choice}" value(s) with "{element_choice}: {bulk_val}".')
+            if localYN == 'Y':
+                print(f'New value: "{bulk_val}". {mode} "_{element_choice}" value(s) with "{bulk_val}".')
+            elif localYN == 'N':
+                print(f'New value: "{bulk_val}". {mode} "{element_choice}" values(s) with "{bulk_val}".')
             proceed_yn = ask_yes_no('Proceed?')
             if proceed_yn == 'Y':
                 break
@@ -395,16 +395,9 @@ def run_main(source, outputDir):
             return mode, element_choice, localYN
         elif choice == '10':
             localYN = 'Y'
-            while True:
-                element_choice = input('\n\n**** Input name of local usage element (without underscore prefix):     ')
-                proceed_yn = ask_yes_no(f'Local usage element: "{element_choice}". Is this correct?')
-                if proceed_yn == 'Y':
-                    mode = append_or_overwrite(source, element_choice, localYN)
-                    print(f'mode: {mode}')
-                    return mode, element_choice, localYN
-                else:
-                    print('\nReturning to main menu.')
-                    break
+            element_choice = input('\n\n**** Input name of local usage element (without underscore prefix):     ')
+            mode = append_or_overwrite(source, element_choice, localYN)
+            return mode, element_choice, localYN
         elif choice.upper() == 'N':
             mode = 'note'
             element_choice = 'NOTE'
