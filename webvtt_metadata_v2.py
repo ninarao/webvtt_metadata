@@ -191,10 +191,14 @@ def get_header_data(parent_head):
         string = [item.split('; ') for item in new_locals]
         flatlist = list(chain.from_iterable(string))
         flatlist = [x.replace('[', '_', 1) if x.startswith('[') else x for x in flatlist]
-        flatlist = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
-        flatlist = [x.replace('software version', 'Software Version', 1) if 'software version' in x else x for x in flatlist]
-        flatlist = [x.replace('Review history', 'Review History', 1) if 'Review history' in x else x for x in flatlist]
-        header_locals = [x.replace('review history', 'Review History', 1) if 'review history' in x else x for x in flatlist]
+        header_locals = [x.replace(']', ':', 1) if ']' in x else x for x in flatlist]
+        make_title_case = ['_software version', '_review history']
+        for i, x in enumerate(header_locals):
+            if x.casefold().startswith(tuple(make_title_case)):
+                for y in make_title_case:
+                    if x.casefold().startswith(y):
+                        header_locals[i] = x[:len(y)].title() + x[len(y):]
+                        break
         for index in sorted(chain(indices, lox), reverse=True):
             del parent_head[index]
         parent_head.extend(header_locals)
@@ -364,7 +368,7 @@ def check_conformance(vtt_head, fileExt, default):
         print(f'forbidden_dupes_in_tupes: {forbidden_dupes_in_tupes}')
     return sorted_tupes, forbidden_arrow, forbidden_dupes_in_tupes
 
-def write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt):
+def write_new_header(final_header, outputDir, outputName, newvtt, line_count):
     final_header = [t[1:] if (t and not t[0]) else t for t in final_header]
     final_header = [(t[0], (', '.join([str(t[1]), str(t[2])]))) if len(t) == 3 else t for t in final_header]
     final_header = [': '.join(map(str, t)) for t in final_header]
@@ -483,7 +487,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(header_data, fileExt, default)
                             if fileExt == '.txt' and line_count != -2:
                                 line_count = lines + 1
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
@@ -519,7 +523,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(header_data, fileExt, default)
                             if fileExt == '.txt' and line_count != -2:
                                 line_count = lines + 1
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
@@ -537,7 +541,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     line_count = lines + 1
                 elif line_count == -3:
                     line_count = 2
-            write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
+            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
             files_updated.append(outputName)
             if forbidden_arrow:
                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
