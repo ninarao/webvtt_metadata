@@ -19,7 +19,7 @@ sys.argv = [
    '-c',
    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
 #     '-r',
-#     '-e',
+    '-e',
 #    '-o',
 #    '-p', 
 #    '/Users/nraogra/Desktop/webvtt_v2',
@@ -90,7 +90,13 @@ def get_header_line_count(vttfile, pattern, fileExt):
     if fileExt == '.vtt':
         return -1
     elif fileExt == '.txt':
-        return -2
+        with open(vttfile, 'r', encoding='UTF-8') as input:
+            if input.readline() == 'WEBVTT\n':
+                count = -3
+            else:
+                count = -2
+            input.close()
+            return count
 
 def find_match(m_csv, outputName):
     with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
@@ -144,7 +150,7 @@ def assess_parent_header(parentfile, parent_dir):
             parent_head = None
             return parent_head, lines
         lines = get_header_line_count(vttfile, pattern, fileExt)
-        if fileExt == '.txt' and lines != -2:
+        if fileExt == '.txt' and lines not in [-1, -2, -3]:
             matches = []
             nl_str = '\n'
             with open(vttfile, 'r', encoding='UTF-8') as input:
@@ -159,7 +165,7 @@ def assess_parent_header(parentfile, parent_dir):
             print('timestamps not found in file')
             parent_head = None
             return parent_head, lines
-        elif (lines == 2 and fileExt == '.vtt') or lines == -2:
+        elif (lines == 2 and fileExt == '.vtt') or lines in [-2, -3]:
             print('no FADGI header detected in file')
             parent_head = None
             return parent_head, lines
@@ -389,6 +395,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
     files_nonconforming = []
     ext = ['.vtt', '.txt']
     for newvtt in glob.glob(f'{reviewed_dir}/*{ext}'):
+        lines = 0
         if os.path.isfile(newvtt):
             justName = Path(newvtt).stem
             fileExt = Path(newvtt).suffix
@@ -415,11 +422,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     datestamp = datetime.datetime.fromtimestamp(timestamp)
             creation_date = datestamp.strftime("%Y-%m-%d")
             line_count = get_header_line_count(newvtt, pattern, fileExt)
-            if line_count == -1:
+            if line_count == -1 and fileExt == '.vtt':
                 print('timestamps not found in file, skipping to next file')
                 files_skipped.append(outputName)
                 continue
-            elif (line_count == 2 and fileExt == '.vtt') or line_count == -2:
+            elif (line_count == 2 and fileExt == '.vtt') or (line_count in [-1, -2, -3] and fileExt == '.txt'):
                 print('no FADGI header detected')
                 header_data = []
                 csv_row_data = ''
@@ -525,8 +532,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             print('no csv and default metadata is not being applied, only updating review history')
                             combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default, overwrite)             
             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(combined, fileExt, default)
-            if fileExt == '.txt' and line_count != -2:
-                line_count = lines + 1
+            if fileExt == '.txt':
+                if line_count not in [-1, -2, -3]:
+                    line_count = lines + 1
+                elif line_count == -3:
+                    line_count = 2
             write_new_header(final_header, outputDir, outputName, newvtt, line_count, fileExt)
             files_updated.append(outputName)
             if forbidden_arrow:
