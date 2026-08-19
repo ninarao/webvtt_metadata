@@ -12,7 +12,7 @@ Python program that writes metadata to WebVTT files according to the [FADGI Guid
 - The script also works with plain text (.txt) files. This usage is outside the scope of the FADGI guidelines, but can be useful for transcript files. If .txt files are present, the script will apply FADGI metadata in the same way as for WebVTT files, with these exceptions:
   - instead of finding existing header data by searching for the first timecode cue, it searches .txt files for the "Type" element
   - if a header is found, it counts header length as the number of lines from the file start to first blank line after the "Type" element
-  - if the existing header has a "Type" value of "caption", the script changes this value to "transcript" if ``--emorydefault`` is selected or to "" if not
+  - any "Type" value in the source file header will be applied as is, but if getting the "Type" value from a parent file header, the script will apply this value as "transcript" if ``--emorydefault`` is selected or to "" if not
   - because "transcript" is not an allowed value for the WebVTT "Type" element, if header data with a "Type" value of "transcript" is applied to a .vtt file, the script will change this value to "caption" if ``--emorydefault`` is selected or to "" if not
 
 ### Usage
