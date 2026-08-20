@@ -10,6 +10,7 @@ import argparse
 import shutil
 from itertools import zip_longest, islice, chain
 import datetime
+import textwrap
 
 sys.argv = [
    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_bulk.py',
@@ -40,6 +41,21 @@ def setup(args_):
     args = parser.parse_args(args_)
     return args
 
+def ask_yes_no(question):
+    '''
+    Returns Y or N. The question variable is just a string.
+    '''
+    answer = ''
+    print(' - \n', question, '\n', 'enter Y or N')
+    while answer not in ('Y', 'y', 'N', 'n'):
+        answer = input()
+        if answer not in ('Y', 'y', 'N', 'n'):
+            print(' - Incorrect input. Please enter Y or N')
+        if answer in ('Y', 'y'):
+            return 'Y'
+        elif answer in ('N,' 'n'):
+            return 'N'
+
 def make_output_dir(source_dir):
     outputDir = os.path.join(source_dir, 'metadata_updated')
     print("checking for output folder...")
@@ -65,14 +81,12 @@ def get_csv_metadata(m_csv):
         keys = data[0]
         values = data[2]
         csv_row_data = list(zip_longest(keys, values, fillvalue=''))
-        check_conformance(csv_row_data)
-        return csv_row_data
+        forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(csv_row_data)
+        return csv_row_data, forbidden_arrow, forbidden_dupes_in_tupes
 
 def check_conformance(csv_row_data):
     arrow = '-->'
     forbidden_arrow = [t for t in csv_row_data if any(arrow in str(x) for x in t)]
-    if forbidden_arrow:
-        print(f'forbidden_arrow: {forbidden_arrow}')
     nonrepeatable = ['Type', 'Originating File', 'File Creation Date', 'Title']
     seen = set()
     dupes = set()
@@ -88,8 +102,7 @@ def check_conformance(csv_row_data):
             forbidden_dupes_in_tupes.add(x)
     if forbidden_dupes_in_tupes:
         forbidden_dupes_in_tupes = [': '.join(map(str, t)) for t in forbidden_dupes_in_tupes]
-        forbidden_dupes_in_tupes = [textwrap.indent(textwrap.fill(t, width=75), '    ') for t in forbidden_dupes_in_tupes]
-        print(f'forbidden_dupes_in_tupes: {forbidden_dupes_in_tupes}')
+        forbidden_dupes_in_tupes = [textwrap.fill(t, width=75) for t in forbidden_dupes_in_tupes]
     return forbidden_arrow, forbidden_dupes_in_tupes
 
 def count_file_header(sourcefile, pattern, fileExt):
@@ -187,31 +200,29 @@ def update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir):
             fileExt = Path(sourcefile).suffix
             if fileExt == '.vtt':
                 outputName = justName + ".vtt"
-                print(f'\n{outputName}')
                 pattern = r'(\d{2}:\d{2}.\d{3} --> )'
             elif fileExt == '.txt':
                 outputName = justName + ".txt"
-                print(f'\n{outputName}')
                 pattern = r'^Type:'
             else:
                 continue
         line_count = count_file_header(sourcefile, pattern, fileExt)
         if line_count == -2:
-            print(f'{outputName} timestamps not found, skipping file')
+            print(f'{outputName}: timestamps not found, skipping file')
             files_skipped.append(outputName)
             continue
         elif (line_count == 2 and fileExt == '.vtt') or line_count in [-1, -3]:
-            print('no FADGI header detected')
+            print(f'{outputName}: no FADGI header detected')
             header = build_header(csv_row_data, txt_type, fileExt)
             write_new_header(header, outputDir, outputName, sourcefile, line_count)
             files_updated.append(outputName)
         else:
             if overwrite == False:
-                print(f'{outputName} has existing webvtt metadata block, skipping file')
+                print(f'{outputName}: has existing webvtt metadata block, skipping file')
                 files_skipped.append(outputName)
                 continue
             else:
-                print(f'{outputName} overwriting existing webvtt metadata block')
+                print(f'{outputName}: overwriting existing webvtt metadata block')
                 header = build_header(csv_row_data, txt_type, fileExt)
                 write_new_header(header, outputDir, outputName, sourcefile, line_count)
                 files_updated.append(outputName)
@@ -248,9 +259,26 @@ def main(args_):
     else:
         print('skip mode:\n\tscript will skip files with existing webvtt metadata blocks')
     outputDir = make_output_dir(source_dir)
-    csv_row_data = get_csv_metadata(m_csv)
+    csv_row_data, forbidden_arrow, forbidden_dupes_in_tupes = get_csv_metadata(m_csv)
     if csv_row_data == '':
-        print('csv data row is empty')
+        print('\ncsv data row is empty')
+    elif forbidden_arrow or forbidden_dupes_in_tupes:
+        while True:
+            print('\ncsv contains nonconforming metadata:')
+            if forbidden_arrow:
+                print('substring "-->" is not allowed in WebVTT comment blocks')
+                print(f'\t{"\n\t".join(map(str, forbidden_arrow))}')
+            if forbidden_dupes_in_tupes:
+                print('duplicate nonrepeatable elements')
+                print(f'\t{"\n\t".join(forbidden_dupes_in_tupes)}')
+            proceed_yn = ask_yes_no('do you want to continue?')
+            if proceed_yn == 'Y':
+                forbiddens = forbidden_arrow
+                files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
+                make_log(files_updated, files_skipped, outputDir)
+                break
+            else:
+                break
     else:
         files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
         make_log(files_updated, files_skipped, outputDir)
