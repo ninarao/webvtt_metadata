@@ -5,10 +5,10 @@ Python program that writes metadata to WebVTT files according to the [FADGI Guid
 - The script has been updated to align with the updated FADGI guidelines, including:
   - repeatable elements are listed as separate "element: value" pairs, each pair on its own line
   - local element formatting has been updated
-  - the FADGI metadata comment block begins with "NOTE" followed by a newline
+  - the FADGI metadata comment block begins with "NOTE" followed by a new line
   - any blank lines within the header block are removed
   - the metadata comment block is separated from the first cue by a blank line
-- The script checks for duplicate nonrepeatable elements and the substring "-->" (which is not allowed in WebVTT comment blocks) and reports any files with nonconforming comment blocks in a log file. The log file also lists all files skipped and all files checked.
+- The script now produces a log file which lists files skipped, files checked, and files with nonconforming metadata comment blocks (blocks with duplicate nonrepeatable elements or the substring "-->" which is not allowed in WebVTT comment blocks)
 - The script also works with plain text (.txt) files. This usage is outside the scope of the FADGI guidelines, but can be useful for transcript files. If .txt files are present, the script will apply FADGI metadata in the same way as for WebVTT files, with these exceptions:
   - instead of finding existing comment block data by searching for the first timecode cue, it searches .txt files for the "Type" element
   - if a comment block is found, it counts the block length as the number of lines from the file start to first blank line after the "Type" element
