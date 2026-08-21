@@ -78,11 +78,15 @@ def get_csv_metadata(m_csv):
     with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
         metadataReader = csv.reader(metadataFile)
         data = list(metadataReader)
-        keys = data[0]
-        values = data[2]
-        csv_row_data = list(zip_longest(keys, values, fillvalue=''))
-        forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(csv_row_data)
-        return csv_row_data, forbidden_arrow, forbidden_dupes_in_tupes
+        try:
+            keys = data[0]
+            values = data[2]
+            csv_row_data = list(zip_longest(keys, values, fillvalue=''))
+            csv_row_data = [t for t in csv_row_data if t[1] != '']
+            return csv_row_data
+        except:
+            csv_row_data = ''
+            return csv_row_data
 
 def check_conformance(csv_row_data):
     arrow = '-->'
@@ -147,7 +151,6 @@ def build_header(csv_row_data, txt_type, fileExt):
         if "Source File".casefold() in key.casefold():
             source = value
             csv_row_data.remove((key, value))
-    csv_row_data = [t for t in csv_row_data if t[1] != '']
     ref_list = ['Header', 'Note', 'Type', 'Language', 'Responsible Party',
             'Media Identifier', 'Originating File', 'File Creator',
             'File Creation Date', 'Title', 'Origin History']
@@ -228,7 +231,7 @@ def update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir):
                 files_updated.append(outputName)
     return files_updated, files_skipped
     
-def make_log(files_updated, files_skipped, outputDir):
+def make_log(files_updated, files_skipped, outputDir, forbiddens):
     timenow = datetime.datetime.now()
     logname = f'webvtt_metadata_log_{timenow.strftime("%y-%m-%d_%Hh%Mm%Ss")}.txt'
     log_source = os.path.join(outputDir, logname)
@@ -242,6 +245,11 @@ def make_log(files_updated, files_skipped, outputDir):
     if files_updated:
         generate_log(log_source, 'Files updated:')
         for item in files_updated:
+            generate_log(log_source, item) 
+    if forbiddens:
+        generate_log(log_source, '')
+        generate_log(log_source, 'Nonconforming metadata elements:')
+        for item in forbiddens:
             generate_log(log_source, item)
     generate_log(log_source, '\nFinished running at ' + timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
             
@@ -259,29 +267,33 @@ def main(args_):
     else:
         print('skip mode:\n\tscript will skip files with existing webvtt metadata blocks')
     outputDir = make_output_dir(source_dir)
-    csv_row_data, forbidden_arrow, forbidden_dupes_in_tupes = get_csv_metadata(m_csv)
+    csv_row_data = get_csv_metadata(m_csv)
     if csv_row_data == '':
-        print('\ncsv data row is empty')
-    elif forbidden_arrow or forbidden_dupes_in_tupes:
-        while True:
-            print('\ncsv contains nonconforming metadata:')
-            if forbidden_arrow:
-                print('substring "-->" is not allowed in WebVTT comment blocks')
-                print(f'\t{"\n\t".join(map(str, forbidden_arrow))}')
-            if forbidden_dupes_in_tupes:
-                print('duplicate nonrepeatable elements')
-                print(f'\t{"\n\t".join(forbidden_dupes_in_tupes)}')
-            proceed_yn = ask_yes_no('do you want to continue?')
-            if proceed_yn == 'Y':
-                forbiddens = forbidden_arrow
-                files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
-                make_log(files_updated, files_skipped, outputDir)
-                break
-            else:
-                break
+        print('\ncsv header row (row 1) or metadata row (row 3) is empty')
     else:
-        files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
-        make_log(files_updated, files_skipped, outputDir)
+        forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(csv_row_data)
+        if forbidden_arrow or forbidden_dupes_in_tupes:
+            while True:
+                print('\ncsv contains nonconforming metadata:')
+                if forbidden_arrow:
+                    forbidden_arrow = [': '.join(map(str, t)) for t in forbidden_arrow]
+                    print('substring "-->" is not allowed in WebVTT comment blocks')
+                    print(f'\t{"\n\t".join(map(str, forbidden_arrow))}')
+                if forbidden_dupes_in_tupes:
+                    print('duplicate nonrepeatable elements')
+                    print(f'\t{"\n\t".join(forbidden_dupes_in_tupes)}')
+                proceed_yn = ask_yes_no('do you want to continue?')
+                if proceed_yn == 'Y':
+                    forbiddens = list(chain(forbidden_arrow, forbidden_dupes_in_tupes))
+                    files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
+                    make_log(files_updated, files_skipped, outputDir, forbiddens)
+                    break
+                else:
+                    break
+        else:
+            forbiddens = ''
+            files_updated, files_skipped = update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir)
+            make_log(files_updated, files_skipped, outputDir, forbiddens)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
