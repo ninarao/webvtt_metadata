@@ -115,15 +115,13 @@ def count_file_header(sourcefile, pattern, fileExt):
     webvtt = 'no'
     try:
         with open(sourcefile, 'r', encoding='UTF-8') as input:
-            if input.readline() == 'WEBVTT\n':
-                webvtt = 'yes'
             for line in input:
                 count += 1
+                if re.search('WEBVTT\n', line):
+                    webvtt = 'yes'
                 if re.search(pattern, line):
                     count -= 1
                     found = 'yes'
-                    if fileExt == '.vtt' and found == 'yes':
-                        count -= 1
                     if fileExt == '.txt' and found == 'yes':
                         matches = []
                         nl_str = '\n'
@@ -217,6 +215,8 @@ def update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir):
         elif (line_count == 2 and fileExt == '.vtt') or line_count in [-1, -3]:
             print(f'{outputName}: no FADGI header detected')
             header = build_header(csv_row_data, txt_type, fileExt)
+            if fileExt == '.txt':
+                line_count = line_count + 1
             write_new_header(header, outputDir, outputName, sourcefile, line_count)
             files_updated.append(outputName)
         else:
@@ -227,6 +227,8 @@ def update_metadata(source_dir, overwrite, csv_row_data, txt_type, outputDir):
             else:
                 print(f'{outputName}: overwriting existing webvtt metadata block')
                 header = build_header(csv_row_data, txt_type, fileExt)
+                if fileExt == '.txt':
+                    line_count = line_count + 1
                 write_new_header(header, outputDir, outputName, sourcefile, line_count)
                 files_updated.append(outputName)
     return files_updated, files_skipped
