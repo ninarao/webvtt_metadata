@@ -12,14 +12,14 @@ from itertools import zip_longest, islice, chain
 import datetime
 import textwrap
 
-sys.argv = [
-   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_bulk.py',
-   '-c',
-   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv', 
-   '/Users/nraogra/Desktop/webvtt_v2',
-   '-o',
-   '-t'
-   ]
+# sys.argv = [
+#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_bulk.py',
+#    '-c',
+#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv', 
+#    '/Users/nraogra/Desktop/webvtt_v2',
+#    '-o',
+#    '-t'
+#    ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -37,7 +37,7 @@ def setup(args_):
     parser.add_argument("source_dir", type=valid_directory, help="Directory of source files")
     parser.add_argument("-c", "--csv", type=valid_csv, help="Metadata CSV")
     parser.add_argument("-o", "--overwrite", action="store_true", help="overwrite existing webvtt metadata blocks instead of skipping")
-    parser.add_argument("-t", "--txt-type", nargs='?', const='blank', default='same')
+    parser.add_argument("-t", "--txt-type", nargs='?', const='blank', default='same', help="set a different Type value for txt files (if used without a value, will set Type as blank for txt files)")
     args = parser.parse_args(args_)
     return args
 
@@ -75,7 +75,7 @@ def generate_log(log, what2log):
             f.write(what2log + '\n')
 
 def get_csv_metadata(m_csv):
-    with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
+    with open(m_csv, 'r', encoding='UTF-8-sig') as metadataFile:
         metadataReader = csv.reader(metadataFile)
         data = list(metadataReader)
         try:
@@ -83,6 +83,9 @@ def get_csv_metadata(m_csv):
             values = data[2]
             csv_row_data = list(zip_longest(keys, values, fillvalue=''))
             csv_row_data = [t for t in csv_row_data if t[1] != '']
+            for key, value in csv_row_data:
+                if key.casefold() == "Source File".casefold():
+                    csv_row_data.remove((key, value))
             return csv_row_data
         except:
             csv_row_data = ''
@@ -145,10 +148,6 @@ def count_file_header(sourcefile, pattern, fileExt):
         return -3
 
 def build_header(csv_row_data, txt_type, fileExt):
-    for key, value in csv_row_data:
-        if "Source File".casefold() in key.casefold():
-            source = value
-            csv_row_data.remove((key, value))
     ref_list = ['Header', 'Note', 'Type', 'Language', 'Responsible Party',
             'Media Identifier', 'Originating File', 'File Creator',
             'File Creation Date', 'Title', 'Origin History']

@@ -111,7 +111,7 @@ def find_match(m_csv, outputName):
             return match_row
 
 def get_csv_metadata(match_row, m_csv):
-    with open(m_csv, 'r', encoding='UTF-8') as metadataFile:
+    with open(m_csv, 'r', encoding='UTF-8-sig') as metadataFile:
         metadataReader = csv.reader(metadataFile)
         data = list(metadataReader)
         keys = data[0]
@@ -240,7 +240,7 @@ def merge_headers(vtt_header_data, parent_header_data, source, overwrite):
 
 def build_combined_header(parent_header_data, csv_row_data, creation_date, reviewed, default, overwrite):
     for key, value in csv_row_data:
-        if "Source File".casefold() in key.casefold():
+        if key.casefold() == "Source File".casefold():
             source = value
             csv_row_data.remove((key, value))
     if csv_row_data != '':

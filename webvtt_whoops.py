@@ -11,12 +11,11 @@ import shutil
 from itertools import islice, chain
 import datetime
 
-sys.argv = [
-   'webvtt_whoops.py',
-   '/Users/nraogra/Desktop/webvtt_v2', 
-   '-t'
-   ]
-# /Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv
+# sys.argv = [
+#    'webvtt_whoops.py',
+#    '/Users/nraogra/Desktop/webvtt_v2', 
+#    '-t'
+#    ]
 
 def setup(args_):
     parser = argparse.ArgumentParser(
@@ -92,7 +91,7 @@ def append_or_overwrite(source, element_choice, localYN):
         else:
             print(' - Incorrect input. Please enter enter 1, 2, or Q')
     
-def revise_element(source, element_choice, outputDir, localYN):
+def revise_element(source, element_choice):
     while True:
         print(f'\nWebVTT directory: {source}')
         print(f'Element selected: {element_choice}')
@@ -121,7 +120,7 @@ def get_csv_info(source, element_choice, localYN):
         source = os.path.abspath(source)
         if localYN == 'Y':
             element_choice = '_' + element_choice
-        with open(m_csv, 'r', encoding='UTF-8') as mFile:
+        with open(m_csv, 'r', encoding='UTF-8-sig') as mFile:
             mReader = csv.reader(mFile)
             try:
                 header_row = next(mReader)
@@ -344,7 +343,7 @@ def find_element_header(count, sourcefile, element_choice, localYN):
     return elementline, orig_head, line_count
 
 def find_file(outputName, m_csv, col_index):
-    with open(m_csv, 'r', encoding='UTF-8') as mFile:
+    with open(m_csv, 'r', encoding='UTF-8-sig') as mFile:
         mReader = csv.reader(mFile)
         match = False
         for row_num, row in enumerate(mReader):
@@ -372,7 +371,7 @@ def main_menu(source):
     print('N. Add NOTE to .vtt files if missing from header')
     print('Q. Quit')
     
-def run_main(source, outputDir):
+def run_main(source):
     while True:
         main_menu(source)
         choice = input('\nEnter your option: ').strip().upper()
@@ -426,7 +425,7 @@ def main(args_):
     outputDir = make_output_dir(source)
     while True:
         status = ''
-        mode, element_choice, localYN = run_main(source, outputDir)
+        mode, element_choice, localYN = run_main(source)
         if mode == 'quit':
             continue
         if mode == 'QUIT':
@@ -437,7 +436,7 @@ def main(args_):
             status = update_vtt(source, m_csv, element_choice, col_index, outputDir, localYN, txt_header, mode)
         if status == 'mainmenu':
             continue
-        choice = revise_element(source, element_choice, outputDir, localYN)
+        choice = revise_element(source, element_choice)
         if choice == '1':
             m_csv, col_index = get_csv_info(source, element_choice, localYN)
             if col_index == '':
