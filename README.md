@@ -48,9 +48,9 @@ To include a local usage element, prefix the element name with an underscore ``_
 
 ### Variations
 
-The csv template is designed so that metadata can be entered separately for each webvtt file. For a version that uses a single set of metadata for all webvtt files in the input folder, use the "_bulk" versions:
+To apply a single set of metadata to all webvtt files in the input folder, use the "bulk" version:
 
-``webvtt_metadata_bulk.py [path/to/webvtt_metadata_bulk.csv] [path/to/inputfolder]``
+``webvtt_metadata_bulk.py [path/to/webvtt_metadata.csv] [path/to/inputfolder]``
 
 Or if you just need to replace a single element in a WebVTT comment block, use `webvtt_whoops.py`:
 
