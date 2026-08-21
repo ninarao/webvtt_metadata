@@ -13,17 +13,17 @@ import shutil
 from itertools import zip_longest, islice, chain
 import textwrap
 
-sys.argv = [
-   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
-   '/Users/nraogra/Desktop/webvtt_v2',
-   '-c',
-   '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
+# sys.argv = [
+#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
+#    '/Users/nraogra/Desktop/webvtt_v2',
+#    '-c',
+#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
 #     '-r',
-    '-e',
+#     '-e',
 #    '-o',
 #    '-p', 
 #    '/Users/nraogra/Desktop/webvtt_v2',
-   ]
+#    ]
 
 def valid_directory(path_string):
     if not os.path.isdir(path_string):
@@ -31,8 +31,6 @@ def valid_directory(path_string):
     return path_string
 
 def valid_csv(path_csv):
-    if not os.path.isfile(path_csv):
-        raise argparse.ArgumentTypeError(f"'{path_csv}' is not a valid csv file.")
     if not path_csv.endswith(".csv"):
         raise argparse.ArgumentTypeError(f"'{path_csv}' is not a valid csv file.")
     else:
@@ -40,7 +38,7 @@ def valid_csv(path_csv):
     
 def setup(args_):
     parser = argparse.ArgumentParser()
-    parser.add_argument("reviewed_dir", type=valid_directory, help="Directory of vtt files")
+    parser.add_argument("source_dir", type=valid_directory, help="Directory of source files")
     parser.add_argument("-c", "--csv", type=valid_csv, help="Metadata CSV")
     parser.add_argument("-e", "--emorydefault", action="store_true", help="use Emory default metadata set for empty fields")
     parser.add_argument("-r", "--reviewed", action="store_true", help="creates/updates FADGI header for reviewed files")
@@ -64,8 +62,8 @@ def ask_yes_no(question):
         elif answer in ('N,' 'n'):
             return 'N'
 
-def make_output_dir(reviewed_dir):
-    outputDir = os.path.join(reviewed_dir, 'metadata_updated')
+def make_output_dir(source_dir):
+    outputDir = os.path.join(source_dir, 'metadata_updated')
     print("checking for output folder...")
     if not os.path.exists(outputDir):
         os.mkdir(outputDir)
@@ -74,10 +72,10 @@ def make_output_dir(reviewed_dir):
         print(f'\toutput folder already exists: \n\t{outputDir}')
     return outputDir
 
-def get_header_line_count(vttfile, pattern, fileExt):
+def get_header_line_count(sourcefile, pattern, fileExt):
     count = 0
     try:
-        with open(vttfile, 'r', encoding='UTF-8') as input:
+        with open(sourcefile, 'r', encoding='UTF-8') as input:
             for line in input:
                 count += 1
                 if re.search(pattern, line):
@@ -86,11 +84,11 @@ def get_header_line_count(vttfile, pattern, fileExt):
                     return count
     except Exception:
         print('line count error')
-        return -1
+        return -4
     if fileExt == '.vtt':
         return -1
     elif fileExt == '.txt':
-        with open(vttfile, 'r', encoding='UTF-8') as input:
+        with open(sourcefile, 'r', encoding='UTF-8') as input:
             if input.readline() == 'WEBVTT\n':
                 count = -3
             else:
@@ -118,14 +116,46 @@ def get_csv_metadata(match_row, m_csv):
         data = list(metadataReader)
         keys = data[0]
         values = data[match_row]
+        parentfile = ''
         zipped = list(zip_longest(keys, values, fillvalue=''))
         for key, value in zipped:
             if key.casefold() == "_Parent File".casefold():
                 parentfile = value
-            else:
-                parentfile = ''
         csv_row_data = zipped
         return csv_row_data, parentfile
+
+def assess_file(sourcefile):
+    justName = Path(sourcefile).stem
+    fileExt = Path(sourcefile).suffix
+    lines = 0
+    if fileExt == '.vtt':
+        pattern = r'(\d{2}:\d{2}.\d{3} --> )'
+        outputName = justName + ".vtt"
+    elif fileExt == '.txt':
+        pattern = r'^Type:'
+        outputName = justName + ".txt"
+    else:
+        outputName = ''
+        return outputName, lines, fileExt
+    lines = get_header_line_count(sourcefile, pattern, fileExt)
+    if fileExt == '.txt' and lines >= 0:
+        matches = []
+        nl_str = '\n'
+        with open(sourcefile, 'r', encoding='UTF-8') as input:
+            for line_num, line in enumerate(islice(input, lines, None)):
+                if line == nl_str:
+                    matches.append(line_num)
+                    if len(matches) == 1:
+                        break
+        if len(matches) == 1:
+            lines = matches[0] + lines
+    return outputName, lines, fileExt
+
+def get_header(sourcefile, lines):
+    with open(sourcefile, 'r', encoding='UTF-8') as input:
+        parent_head = [next(input) for _ in range(lines)]
+    input.close()
+    return parent_head, lines
 
 def assess_parent_header(parentfile, parent_dir):
     lines = -1
@@ -133,48 +163,21 @@ def assess_parent_header(parentfile, parent_dir):
         print('no directory for parent files')
         parent_head = None
         return parent_head, lines
-    vttfile = os.path.join(parent_dir, parentfile)
-    if not os.path.isfile(vttfile):
-        print(f'file does not exist: {vttfile}')
+    sourcefile = os.path.join(parent_dir, parentfile)
+    if not os.path.isfile(sourcefile):
+        print(f'file does not exist: {sourcefile}')
         parent_head = None
         return parent_head, lines
     else:
-        justName = Path(vttfile).stem
-        fileExt = Path(vttfile).suffix
-        if fileExt == '.vtt':
-            pattern = r'(\d{2}:\d{2}.\d{3} --> )'
-        elif fileExt == '.txt':
-            pattern = r'^Type:'
+        outputName, lines, fileExt = assess_file(sourcefile)
+        if outputName == '':
+            print('file is not .vtt or .txt')
+            parent_head = None
+        elif (lines == 2 and fileExt == '.vtt') or lines in [-1, -2, -3, -4]:
+            parent_head = None
         else:
-            print(f'file {justName}{fileExt} is not .vtt or .txt')
-            parent_head = None
-            return parent_head, lines
-        lines = get_header_line_count(vttfile, pattern, fileExt)
-        if fileExt == '.txt' and lines not in [-1, -2, -3]:
-            matches = []
-            nl_str = '\n'
-            with open(vttfile, 'r', encoding='UTF-8') as input:
-                for line_num, line in enumerate(islice(input, lines, None)):
-                    if line == nl_str:
-                        matches.append(line_num)
-                        if len(matches) == 1:
-                            break
-            if len(matches) == 1:
-                lines = matches[0] + lines
-        if lines == -1:
-            print('timestamps not found in file')
-            parent_head = None
-            return parent_head, lines
-        elif (lines == 2 and fileExt == '.vtt') or lines in [-2, -3]:
-            print('no FADGI header detected in file')
-            parent_head = None
-            return parent_head, lines
-        else:
-            print(f'FADGI header found: {lines} lines')
-            with open(vttfile, 'r', encoding='UTF-8') as input:
-                parent_head = [next(input) for _ in range(lines)]
-            input.close()
-            return parent_head, lines
+            parent_head, lines = get_header(sourcefile, lines)
+        return parent_head, lines
 
 def get_header_data(parent_head):
     parent_head = [x for x in parent_head if x != '\n']
@@ -368,12 +371,12 @@ def check_conformance(vtt_head, fileExt, default):
         print(f'forbidden_dupes_in_tupes: {forbidden_dupes_in_tupes}')
     return sorted_tupes, forbidden_arrow, forbidden_dupes_in_tupes
 
-def write_new_header(final_header, outputDir, outputName, newvtt, line_count):
+def write_new_header(final_header, outputDir, outputName, sourcefile, line_count):
     final_header = [t[1:] if (t and not t[0]) else t for t in final_header]
     final_header = [(t[0], (', '.join([str(t[1]), str(t[2])]))) if len(t) == 3 else t for t in final_header]
     final_header = [': '.join(map(str, t)) for t in final_header]
     newfile = os.path.join(outputDir, outputName)
-    with open(newvtt, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
+    with open(sourcefile, 'r', encoding='UTF-8') as f_in, open(newfile, 'w', encoding='UTF-8') as f_out:
         for item in final_header:
             f_out.write(f'{item}\n')
         for _ in range(line_count):
@@ -389,35 +392,49 @@ def generate_log(log, what2log):
     else:
         with open(log, "a", encoding='utf-8') as f:
             f.write(what2log + '\n')
-
-def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, default, overwrite):
+            
+def make_log(files_updated, files_skipped, outputDir, files_nonconforming):
     timenow = datetime.datetime.now()
     logname = f'webvtt_metadata_log_{timenow.strftime("%y-%m-%d_%Hh%Mm%Ss")}.txt'
     log_source = os.path.join(outputDir, logname)
+    generate_log(log_source, 'WebVTT metadata log for ' + outputDir + '\n')
+    if files_skipped:
+        generate_log(log_source, 'Files skipped:')
+        for item in files_skipped:
+            generate_log(log_source, item)
+    if files_skipped and files_updated:
+        generate_log(log_source, '')
+    if files_updated:
+        generate_log(log_source, 'Files checked:')
+        for item in files_updated:
+            generate_log(log_source, item)
+    if files_updated and files_nonconforming:
+        generate_log(log_source, '')
+    elif files_skipped and files_nonconforming and not files_updated:
+        generate_log(log_source, '')
+    if files_nonconforming:
+        generate_log(log_source, 'Files with nonconforming metadata:')
+        for item in files_nonconforming:
+            generate_log(log_source, item)
+    generate_log(log_source, '\nFinished running at ' + timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
+
+def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default, overwrite):
     files_updated = []
     files_skipped = []
     files_nonconforming = []
     ext = ['.vtt', '.txt']
-    for newvtt in glob.glob(f'{reviewed_dir}/*{ext}'):
+    for sourcefile in glob.glob(f'{source_dir}/*{ext}'):
         lines = 0
-        if os.path.isfile(newvtt):
-            justName = Path(newvtt).stem
-            fileExt = Path(newvtt).suffix
-            if fileExt == '.vtt':
-                outputName = justName + ".vtt"
-                print(f'\n{outputName}')
-                pattern = r'(\d{2}:\d{2}.\d{3} --> )'
-            elif fileExt == '.txt':
-                outputName = justName + ".txt"
-                print(f'\n{outputName}')
-                pattern = r'^Type:'
-            else:
+        line_count = 0
+        if os.path.isfile(sourcefile):
+            outputName, line_count, fileExt = assess_file(sourcefile)
+            if outputName == '':
                 continue
             if platform.system() == 'Windows':
-                c_timestamp = os.path.getctime(newvtt)
+                c_timestamp = os.path.getctime(sourcefile)
                 datestamp = datetime.datetime.fromtimestamp(c_timestamp)
             else:
-                stat = os.stat(newvtt)
+                stat = os.stat(sourcefile)
                 try:
                     timestamp = stat.st_birthtime
                     datestamp = datetime.datetime.fromtimestamp(timestamp)
@@ -425,12 +442,12 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                     timestamp = stat.st_mtime
                     datestamp = datetime.datetime.fromtimestamp(timestamp)
             creation_date = datestamp.strftime("%Y-%m-%d")
-            line_count = get_header_line_count(newvtt, pattern, fileExt)
-            if line_count == -1 and fileExt == '.vtt':
+            print(f'\n{outputName}')
+            if line_count == -1:
                 print('timestamps not found in file, skipping to next file')
                 files_skipped.append(outputName)
                 continue
-            elif (line_count == 2 and fileExt == '.vtt') or (line_count in [-1, -2, -3] and fileExt == '.txt'):
+            elif (line_count == 2 and fileExt == '.vtt') or line_count in [-2, -3, -4]:
                 print('no FADGI header detected')
                 header_data = []
                 csv_row_data = ''
@@ -469,7 +486,8 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                         files_skipped.append(outputName)
                         continue
             else:
-                vtt_head, lines = assess_parent_header(newvtt, reviewed_dir)
+                print(f'FADGI header found: {line_count} lines')
+                vtt_head, lines = get_header(sourcefile, line_count)
                 header_data = get_header_data(vtt_head)
                 csv_row_data = ''
                 if m_csv != None:
@@ -487,7 +505,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(header_data, fileExt, default)
                             if fileExt == '.txt' and line_count != -2:
                                 line_count = lines + 1
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
+                            write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
@@ -523,7 +541,7 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(header_data, fileExt, default)
                             if fileExt == '.txt' and line_count != -2:
                                 line_count = lines + 1
-                            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
+                            write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
                                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
@@ -537,11 +555,11 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
                             combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default, overwrite)             
             final_header, forbidden_arrow, forbidden_dupes_in_tupes = check_conformance(combined, fileExt, default)
             if fileExt == '.txt':
-                if line_count not in [-1, -2, -3]:
+                if line_count not in [-1, -2, -3, -4]:
                     line_count = lines + 1
                 elif line_count == -3:
                     line_count = 2
-            write_new_header(final_header, outputDir, outputName, newvtt, line_count)
+            write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
             files_updated.append(outputName)
             if forbidden_arrow:
                 files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
@@ -552,36 +570,17 @@ def update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, defaul
             continue
         else:
             continue
-    generate_log(log_source, 'WebVTT metadata log for ' + outputDir + '\n')
-    if files_skipped:
-        generate_log(log_source, 'Files skipped:')
-        for item in files_skipped:
-            generate_log(log_source, item)
-    if files_skipped and files_updated:
-        generate_log(log_source, '')
-    if files_updated:
-        generate_log(log_source, 'Files checked:')
-        for item in files_updated:
-            generate_log(log_source, item)
-    if files_updated and files_nonconforming:
-        generate_log(log_source, '')
-    elif files_skipped and files_nonconforming and not files_updated:
-        generate_log(log_source, '')
-    if files_nonconforming:
-        generate_log(log_source, 'Files with nonconforming metadata:')
-        for item in files_nonconforming:
-            generate_log(log_source, item)
-    generate_log(log_source, '\nFinished running at ' + timenow.strftime("%Y-%m-%d %H:%M:%S%p") + '\n')
+    return files_updated, files_skipped, outputDir, files_nonconforming
 
 def main(args_):
     args = setup(args_)
-    reviewed_dir = args.reviewed_dir
+    source_dir = args.source_dir
     parent_dir = args.parentfiles
     default = args.emorydefault
     reviewed = args.reviewed
     overwrite = args.overwrite
     print('*** webvtt metadata - settings chosen: ***')
-    print(f'reviewed vtt directory:\n\t{reviewed_dir}')
+    print(f'reviewed vtt directory:\n\t{source_dir}')
     if args.csv != None:
         m_csv = args.csv
         print(f'metadata csv:\n\t{m_csv}')
@@ -607,8 +606,9 @@ def main(args_):
         print('append mode:\n\tscript will append repeatable element values and preserve any existing values')
     proceed = ask_yes_no('proceed with these settings?')
     if proceed =='Y':
-        outputDir = make_output_dir(reviewed_dir)
-        update_metadata(reviewed_dir, m_csv, outputDir, parent_dir, reviewed, default, overwrite)
+        outputDir = make_output_dir(source_dir)
+        files_updated, files_skipped, outputDir, files_nonconforming = update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default, overwrite)
+        make_log(files_updated, files_skipped, outputDir, files_nonconforming)
     else:
         print('exiting. goodbye!')
         sys.exit()
