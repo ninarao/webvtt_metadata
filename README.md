@@ -27,7 +27,7 @@ Command options:
 - ``-p`` or ``--parentfiles`` ``[path/to/parentfolder]``: Check directory of parent files for associated comment block data (requires CSV to match source file with parent file)
 - ``-o`` or ``--overwrite``: if new values are given for repeatable elements, overwrite the existing values
 
-For nonrepeatable elements, the script uses metadata from the csv first, then from the source file comment block, then from the parent file comment block (with one exception: File Creation Date will be carried over from the csv metadata or the source file comment block, but not from the parent file comment block). For repeatable elements, if values exist in multiple sources, the script by default will preserve existing values and append any new ones. To overwrite values instead of appending, use option ``-o``. Local elements are handled as nonrepeatable except that values for ``_Reviewer`` are retained from each source and any file source is indicated.
+For nonrepeatable elements, the script uses metadata from the csv first, then from the source file comment block, then from the parent file comment block (with one exception: File Creation Date will be carried over from the csv metadata or the source file comment block, but not from the parent file comment block). For repeatable elements, if values exist in multiple sources, the script by default will preserve existing values and append any new ones. To overwrite values instead of appending, use option ``-o``. Local elements are handled the same as nonrepeatable except that values for ``_Reviewer`` are retained from each source and any file source is indicated.
 
 ### CSV template
 The template includes all strongly recommended, recommended, and optional elements:
