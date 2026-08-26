@@ -41,7 +41,7 @@ def setup(args_):
     parser.add_argument("source_dir", type=valid_directory, help="Directory of source files")
     parser.add_argument("-c", "--csv", type=valid_csv, help="Metadata CSV")
     parser.add_argument("-e", "--emorydefault", action="store_true", help="use Emory default metadata set for empty fields")
-    parser.add_argument("-r", "--reviewed", action="store_true", help="creates/updates FADGI header for reviewed files")
+    parser.add_argument("-r", "--reviewed", action="store_true", help='creates/updates "_Review History" element with value "human-reviewed"')
     parser.add_argument("-o", "--overwrite", action="store_true", help="overwrite repeatable element values instead of appending")
     parser.add_argument("-p", "--parentfiles", type=valid_directory, help="Directory of parent files")
     args = parser.parse_args(args_)
@@ -448,7 +448,7 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
                 files_skipped.append(outputName)
                 continue
             elif (line_count == 2 and fileExt == '.vtt') or line_count in [-2, -3, -4]:
-                print('no FADGI header detected')
+                print('no FADGI comment block detected')
                 header_data = []
                 csv_row_data = ''
                 if m_csv != None:
@@ -468,25 +468,27 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
                         print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                         csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                         if parentfile != '':
-                            print(f'contains parent info: {parentfile}, getting parent file header...')
+                            print(f'contains parent info: {parentfile}, checking for parent file comment block...')
                             parent_head, lines = assess_parent_header(parentfile, parent_dir)
                             if parent_head != None:
-                                print('combining parent file header and metadata from csv...')
+                                print('combining parent file comment block data and metadata from csv...')
                                 header_data = get_header_data(parent_head)
+                            else:
+                                print('no FADGI comment block detected in parent file')
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default, overwrite)
                 else:
                     if default == True:
                         if reviewed == False:
-                            print('no csv and no header, using default unreviewed metadata')
+                            print('no csv and no source file comment block, using default unreviewed metadata')
                         else:
-                            print('no csv and no header, using default reviewed metadata')
+                            print('no csv and no source file comment block, using default reviewed metadata')
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default, overwrite)
                     else:
-                        print('no csv, no header, and default metadata is not being applied, skipping to next file')
+                        print('no csv, no source file comment block, and default metadata is not being applied; skipping to next file')
                         files_skipped.append(outputName)
                         continue
             else:
-                print(f'FADGI header found: {line_count} lines')
+                print(f'FADGI comment block found: {line_count} lines')
                 vtt_head, lines = get_header(sourcefile, line_count)
                 header_data = get_header_data(vtt_head)
                 csv_row_data = ''
@@ -508,10 +510,10 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
                             write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                                files_nonconforming.append(outputName + ' comment block contains restricted arrow substring:\n' +
                                                            '\n'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_tupes:
-                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                                files_nonconforming.append(outputName + ' comment block has duplicate nonrepeatable elements:\n' +
                                                            '\n'.join(map(str, forbidden_dupes_in_tupes)))
                             continue
                         else:
@@ -521,12 +523,14 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
                         print(f'matching row found for {outputName}: row {match_row}; getting csv metadata...')
                         csv_row_data, parentfile = get_csv_metadata(match_row, m_csv)
                         if parentfile != '':
-                            print(f'contains parent info: {parentfile}, getting parent file header...')
+                            print(f'contains parent info: {parentfile}, checking for parent file comment block...')
                             parent_head, lines = assess_parent_header(parentfile, parent_dir)
                             if parent_head != None:
-                                print('combining source header, parent file header, and metadata from csv...')
+                                print('combining source comment block data, parent file comment block data, and metadata from csv...')
                                 parent_header_data = get_header_data(parent_head)
                                 header_data = merge_headers(header_data, parent_header_data, parentfile, overwrite)
+                            else:
+                                print('no FADGI comment block detected in parent file')
                         combined = build_combined_header(header_data, csv_row_data, creation_date, reviewed, default, overwrite)
                 else:
                     if default == True:
@@ -544,10 +548,10 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
                             write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
                             files_updated.append(outputName)
                             if forbidden_arrow:
-                                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                                files_nonconforming.append(outputName + ' comment block contains restricted arrow substring:\n' +
                                                            '\n'.join([str(x) for x in forbidden_arrow]))
                             if forbidden_dupes_in_tupes:
-                                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                                files_nonconforming.append(outputName + ' comment block has duplicate nonrepeatable elements:\n' +
                                                            '\n'.join(map(str, forbidden_dupes_in_tupes)))
                             continue
                         else:
@@ -562,10 +566,10 @@ def update_metadata(source_dir, m_csv, outputDir, parent_dir, reviewed, default,
             write_new_header(final_header, outputDir, outputName, sourcefile, line_count)
             files_updated.append(outputName)
             if forbidden_arrow:
-                files_nonconforming.append(outputName + ' header contains restricted arrow substring:\n' +
+                files_nonconforming.append(outputName + ' comment block contains restricted arrow substring:\n' +
                                            '\n'.join([str(x) for x in forbidden_arrow]))
             if forbidden_dupes_in_tupes:
-                files_nonconforming.append(outputName + ' header has duplicate nonrepeatable elements:\n' +
+                files_nonconforming.append(outputName + ' comment block has duplicate nonrepeatable elements:\n' +
                                            '\n'.join(map(str, forbidden_dupes_in_tupes)))
             continue
         else:
@@ -580,7 +584,7 @@ def main(args_):
     reviewed = args.reviewed
     overwrite = args.overwrite
     print('*** webvtt metadata - settings chosen: ***')
-    print(f'source vtt directory:\n\t{source_dir}')
+    print(f'source file directory:\n\t{source_dir}')
     if args.csv != None:
         m_csv = args.csv
         print(f'metadata csv:\n\t{m_csv}')
@@ -592,18 +596,17 @@ def main(args_):
     else:
         print('directory of parent files:\n\tno parent file directory provided')
     if reviewed == True:
-        print('source files are: reviewed\n\tscript will update "review history" to "human-reviewed"\n\t(it will also create this element if it doesn\'t exist)')
+        print('source files are: reviewed\n\tscript will update "_Review History" status to "human-reviewed"\n\tor create this element if it doesn\'t exist')
     else:
-        print('source files are: unreviewed\n\tscript will create initial FADGI headers\n\tand check or update existing FADGI headers'
-              '\n\texisting "review history" elements will not be changed')
+        print('source files are: unreviewed\n\texisting "_Review History" elements will not be changed')
     if default == True:
         print('default metadata: true\n\tscript will use Emory default metadata set for empty fields')
     else:
         print('default metadata: false\n\tscript will not use Emory default metadata set for empty fields')
     if overwrite == True:
-        print('overwrite mode:\n\tscript will overwrite existing repeatable element values if new values are given')
+        print('mode: overwrite\n\tscript will overwrite existing repeatable element values if new values are given')
     else:
-        print('append mode:\n\tscript will append repeatable element values and preserve any existing values')
+        print('mode: append\n\tscript will append repeatable element values and preserve any existing values')
     proceed = ask_yes_no('proceed with these settings?')
     if proceed =='Y':
         outputDir = make_output_dir(source_dir)
