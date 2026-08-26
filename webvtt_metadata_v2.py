@@ -580,7 +580,7 @@ def main(args_):
     reviewed = args.reviewed
     overwrite = args.overwrite
     print('*** webvtt metadata - settings chosen: ***')
-    print(f'reviewed vtt directory:\n\t{source_dir}')
+    print(f'source vtt directory:\n\t{source_dir}')
     if args.csv != None:
         m_csv = args.csv
         print(f'metadata csv:\n\t{m_csv}')
@@ -592,9 +592,9 @@ def main(args_):
     else:
         print('directory of parent files:\n\tno parent file directory provided')
     if reviewed == True:
-        print('webvtt files are: reviewed\n\tscript will update "review history" to "human-reviewed"\n\t(it will also create this element if it doesn\'t exist)')
+        print('source files are: reviewed\n\tscript will update "review history" to "human-reviewed"\n\t(it will also create this element if it doesn\'t exist)')
     else:
-        print('webvtt files are: unreviewed\n\tscript will create initial FADGI headers\n\tand check or update existing FADGI headers'
+        print('source files are: unreviewed\n\tscript will create initial FADGI headers\n\tand check or update existing FADGI headers'
               '\n\texisting "review history" elements will not be changed')
     if default == True:
         print('default metadata: true\n\tscript will use Emory default metadata set for empty fields')
