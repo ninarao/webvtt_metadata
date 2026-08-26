@@ -47,17 +47,23 @@ Any elements left blank will not be included in the output comment block (or wil
 To include a local usage element, prefix the element name with an underscore ``_`` in the header row.
 
 ### Variations
-
-To apply a single set of metadata to all webvtt files in the input folder, use the "bulk" version:
-
-``webvtt_metadata_bulk.py [path/to/webvtt_metadata.csv] [path/to/inputfolder]``
-
-Or if you just need to replace a single element in a WebVTT comment block, use `webvtt_whoops.py`:
-
-``webvtt_whoops.py [path/to/inputfolder]`` 
-
-(This script will prompt for an optional csv - if replacing with values from a csv, the name of the element should be in the header row.)
-
+#### webvtt_metadata_bulk.py
+- applies a single set of metadata to all .vtt and .txt files in the source folder
+- checks input for nonconforming elements ("-->" or duplicate nonrepeatable elements) and warns if present
+- creates a log of files skipped, files updated, and files with nonconforming metadata comment blocks
+- usage: ``webvtt_metadata_bulk.py -c [path/to/webvtt_metadata.csv] [path/to/sourcefolder]``
+  - use csv row 1 for element names and row 3 for values
+  - ``-o`` or ``--overwrite``: if new values are given for repeatable elements, overwrite the existing values
+  - ``-t`` or ``--txt-type``: set a different "Type" value for .txt files (if used without specifying a value, will set Type as blank for .txt files)
+#### webvtt_whoops.py
+- for replacing or appending a single element-value pair in a metadata comment block (or creating this element for files that don't have existing comment blocks)
+- works with nonlocal and local elements
+- creates a log of files skipped and files updated
+- new values can be added globally for all files or for individual files using an optional csv
+- if using a csv, the script will skip any files not listed in the csv
+- "NOTE" mode checks .vtt files for NOTE string at start of comment block and adds this if missing (this mode skips .txt files and files without comment blocks)
+- usage: ``webvtt_whoops.py [path/to/inputfolder]`` 
+  - ``-t`` or ``--txtheader``: applies actions to .txt files as well as .vtt files
 
 ##
 Feedback, comments, suggestions, etc are welcome!
