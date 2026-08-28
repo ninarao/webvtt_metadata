@@ -15,9 +15,9 @@ import textwrap
 
 # sys.argv = [
 #    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_v2.py',
-#    '/Users/nraogra/Desktop/webvtt_v2',
+#    '/Users/nraogra/Desktop/webvtt_v2/ipres2026/files',
 #    '-c',
-#    '/Users/nraogra/Desktop/webvtt_v2/webvtt_metadata_locals.csv',
+#    '/Users/nraogra/Desktop/webvtt_v2/ipres2026/webvtt_metadata_1.csv',
 #     '-r',
 #     '-e',
 #    '-o',
@@ -304,7 +304,7 @@ def check_conformance(vtt_head, fileExt, default):
     note_str = 'NOTE'
     type_str = 'Type'
     if fileExt == '.vtt':
-        webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() in s[1].casefold()), -1)    
+        webvtt_index = next((i for i, s in enumerate(sorted_tupes) if webvtt_str.casefold() == s[1].casefold()), -1)    
         if webvtt_index == -1:
             sorted_tupes.insert(0, ('', 'WEBVTT'))
         else:
@@ -314,7 +314,7 @@ def check_conformance(vtt_head, fileExt, default):
                 item = sorted_tupes.pop(webvtt_index)
                 sorted_tupes.insert(0, item)
         sorted_tupes.insert(1, ('', ''))
-        note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() in s[1].casefold()), -1)
+        note_index = next((i for i, s in enumerate(sorted_tupes) if note_str.casefold() == s[1].casefold()), -1)
         if note_index == -1:
             sorted_tupes.insert(2, ('', 'NOTE'))
         else:
@@ -323,7 +323,7 @@ def check_conformance(vtt_head, fileExt, default):
             if note_index != 2:
                 item = sorted_tupes.pop(note_index)
                 sorted_tupes.insert(2, item)
-        type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
+        type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() == s[0].casefold()), -1)
         if type_index != -1:
             if 'transcript'.casefold() in sorted_tupes[type_index][1].casefold():
                 if default == False:
@@ -335,7 +335,7 @@ def check_conformance(vtt_head, fileExt, default):
     if fileExt == '.txt':
         sorted_tupes = [t for t in sorted_tupes if t[1] != webvtt_str]
         sorted_tupes = [t for t in sorted_tupes if t[1] != note_str]
-        type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() in s[0].casefold()), -1)
+        type_index = next((i for i, s in enumerate(sorted_tupes) if type_str.casefold() == s[0].casefold()), -1)
         if default == True:
             if type_index == -1:
                 sorted_tupes.insert(0, ('Type', 'transcript'))
