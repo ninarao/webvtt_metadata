@@ -1,5 +1,5 @@
 # webvtt_metadata
-Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 2.0)], using a csv template file, existing FADGI comment block data from the current file, comment block data from an associated parent file, and/or a default metadata set. The script does not overwrite the input files; output is written to a new folder that is created inside the input folder.
+Python program that writes metadata to WebVTT files according to the [FADGI Guidelines for Embedding Metadata in WebVTT Files (Version 2.0)](https://www.digitizationguidelines.gov/guidelines/FADGI_WebVTT_embed_guidelines_v2.0.pdf), using a csv template file, existing FADGI comment block data from the current file, comment block data from an associated parent file, and/or a default metadata set. The script does not overwrite the input files; output is written to a new folder that is created inside the input folder.
 
 ### Updates
 - The script has been updated to align with the updated FADGI guidelines, including:
@@ -59,9 +59,10 @@ To include a local usage element, prefix the element name with an underscore ``_
 - for replacing or appending a single element-value pair in a metadata comment block (or creating this element for files that don't have existing comment blocks)
 - works with nonlocal and local elements
 - creates a log of files skipped and files updated
-- new values can be added globally for all files or for individual files using an optional csv
-- if using a csv, the script will skip any files not listed in the csv
-- "NOTE" mode checks .vtt files for NOTE string at start of comment block and adds this if missing (this mode skips .txt files and files without comment blocks)
+- a new value can be added globally for all files or new values can be added for individual files using an optional csv
+  - if using a csv, the script will skip any files not listed in the csv
+- "NOTE" mode checks .vtt files for NOTE string at start of comment block and adds this if missing
+  - this mode skips .txt files and files without comment blocks
 - usage: ``webvtt_whoops.py [path/to/inputfolder]`` 
   - ``-t`` or ``--txtheader``: applies actions to .txt files as well as .vtt files
 
